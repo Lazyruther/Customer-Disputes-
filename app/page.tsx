@@ -1,36 +1,44 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useMemo, useState } from "react";
 
 type RefundFormData = {
   transactionId: string;
-  customerName: string;
   customerEmail: string;
+  reason: string;
   description: string;
   proofFileName: string;
 };
 
-type FormErrors = Partial<Record<keyof RefundFormData, string>> & {
-  customerEmail?: string;
-};
+type FormErrors = Partial<Record<keyof RefundFormData, string>>;
 
-type RefundConfirmation = RefundFormData & {
-  refundId: string;
-  submittedAt: string;
-};
+type TouchedFields = Record<keyof RefundFormData, boolean>;
 
 const initialForm: RefundFormData = {
   transactionId: "",
-  customerName: "",
   customerEmail: "",
+  reason: "",
   description: "",
   proofFileName: ""
 };
 
+const initialTouched: TouchedFields = {
+  transactionId: false,
+  customerEmail: false,
+  reason: false,
+  description: false,
+  proofFileName: false
+};
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const requiredFields: (keyof RefundFormData)[] = ["transactionId", "customerEmail", "reason"];
+
 export default function RefundRequestPage() {
   const [form, setForm] = useState<RefundFormData>(initialForm);
   const [errors, setErrors] = useState<FormErrors>({});
-  const [confirmation, setConfirmation] = useState<RefundConfirmation | null>(null);
+  const [touched, setTouched] = useState<TouchedFields>(initialTouched);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   const emailPattern = useMemo(
     () =>
@@ -38,61 +46,153 @@ export default function RefundRequestPage() {
     []
   );
 
-  function handleChange<T extends keyof RefundFormData>(field: T, value: RefundFormData[T]) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setErrors((prev) => ({ ...prev, [field]: undefined }));
+  const isEmailValid = form.customerEmail.trim() !== "" && emailPattern.test(form.customerEmail.trim());
+  const isFormValid =
+    form.transactionId.trim() !== "" && isEmailValid && form.reason.trim() !== "" && !errors.proofFileName;
+
+  function getFieldError(field: keyof RefundFormData, value: string): string | undefined {
+    const trimmed = value.trim();
+
+    switch (field) {
+      case "transactionId":
+        if (!trimmed) {
+          return "Transaction ID is required.";
+        }
+        break;
+      case "customerEmail":
+        if (!trimmed) {
+          return "Customer email is required.";
+        }
+        if (!emailPattern.test(trimmed)) {
+          return "Enter a valid email address.";
+        }
+        break;
+      case "reason":
+        if (!trimmed) {
+          return "Choose a reason for the dispute.";
+        }
+        break;
+      default:
+        break;
+    }
+
+    return undefined;
   }
 
-  function validate(): boolean {
+  function updateFieldError(field: keyof RefundFormData, value: string) {
+    const error = getFieldError(field, value);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (error) {
+        next[field] = error;
+      } else {
+        delete next[field];
+      }
+      return next;
+    });
+  }
+
+  function handleChange<T extends keyof RefundFormData>(field: T, value: RefundFormData[T]) {
+    setSuccessMessage(null);
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    updateFieldError(field, value);
+  }
+
+  function handleBlur<T extends keyof RefundFormData>(field: T) {
+    setTouched((prev) => ({ ...prev, [field]: true }));
+    updateFieldError(field, form[field]);
+  }
+
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    setSuccessMessage(null);
+    setTouched((prev) => ({ ...prev, proofFileName: true }));
+
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      setForm((prev) => ({ ...prev, proofFileName: "" }));
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.proofFileName;
+        return next;
+      });
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setErrors((prev) => ({ ...prev, proofFileName: "File must be 5MB or smaller." }));
+      setForm((prev) => ({ ...prev, proofFileName: "" }));
+      setFileInputKey((prev) => prev + 1);
+      return;
+    }
+
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.proofFileName;
+      return next;
+    });
+    setForm((prev) => ({ ...prev, proofFileName: file.name }));
+  }
+
+  function validateForm() {
     const nextErrors: FormErrors = {};
 
-    if (!form.transactionId.trim()) {
-      nextErrors.transactionId = "Transaction ID is required.";
-    }
+    requiredFields.forEach((field) => {
+      const error = getFieldError(field, form[field]);
+      if (error) {
+        nextErrors[field] = error;
+      }
+    });
 
-    if (form.customerEmail.trim() && !emailPattern.test(form.customerEmail.trim())) {
-      nextErrors.customerEmail = "Enter a valid email address.";
-    }
+    setErrors((prev) => {
+      const updated: FormErrors = { ...prev };
+      requiredFields.forEach((field) => {
+        delete updated[field];
+      });
+      return { ...updated, ...nextErrors };
+    });
 
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    setTouched((prev) => ({ ...prev, transactionId: true, customerEmail: true, reason: true }));
+
+    return Object.keys(nextErrors).length === 0 && !errors.proofFileName;
+  }
+
+  function generateCaseId() {
+    const random = Array.from({ length: 5 }, () =>
+      Math.floor(Math.random() * 36).toString(36).toUpperCase()
+    ).join("");
+    return `RFD-${random}`;
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (!validate()) {
+    if (!validateForm()) {
       return;
     }
 
-    const refundId = `RF-${Date.now().toString(36).toUpperCase()}`;
-    const submittedAt = new Date().toISOString();
+    const caseId = generateCaseId();
+    setSuccessMessage(
+      `✅ Refund request submitted. Your Case ID is ${caseId}. We’ll get back to you within 48 hours.`
+    );
 
-    const submission: RefundConfirmation = {
-      ...form,
-      refundId,
-      submittedAt
-    };
-
-    try {
-      if (typeof window !== "undefined") {
-        const historyKey = "refundSubmissions";
-        const existing = window.localStorage.getItem(historyKey);
-        const history = existing ? JSON.parse(existing) : [];
-        history.unshift(submission);
-        window.localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 20)));
-      }
-    } catch (storageError) {
-      console.warn("Unable to persist submission to localStorage", storageError);
-    }
-
-    setConfirmation(submission);
-    setForm(initialForm);
+    setForm({ ...initialForm });
+    setTouched({ ...initialTouched });
+    setErrors((prev) => {
+      const next = { ...prev };
+      requiredFields.forEach((field) => {
+        delete next[field];
+      });
+      delete next.proofFileName;
+      return next;
+    });
+    setFileInputKey((prev) => prev + 1);
   }
 
   return (
-    <main className="px-4 py-10 text-white">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
+    <main className="min-h-screen bg-slate-950 px-4 py-12 text-slate-100">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <header className="text-center">
           <h1 className="text-3xl font-semibold sm:text-4xl">Customer Dispute Form</h1>
           <p className="mt-2 text-sm text-slate-300">
@@ -100,132 +200,132 @@ export default function RefundRequestPage() {
           </p>
         </header>
 
-        <section className="mx-auto w-full max-w-3xl rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md sm:p-10">
+        {successMessage && (
+          <div
+            className="rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-100 shadow-lg"
+            role="status"
+            aria-live="polite"
+          >
+            {successMessage}
+          </div>
+        )}
+
+        <section className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-2xl backdrop-blur-sm sm:p-10">
           <form className="space-y-6" onSubmit={handleSubmit} noValidate>
-            <div className="grid gap-6 sm:grid-cols-2">
+            <div className="space-y-5">
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Transaction ID *</label>
+                <label className="block text-sm font-medium" htmlFor="transactionId">
+                  Transaction ID <span className="text-rose-300">*</span>
+                </label>
                 <input
+                  id="transactionId"
                   type="text"
                   value={form.transactionId}
                   onChange={(event) => handleChange("transactionId", event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  onBlur={() => handleBlur("transactionId")}
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
                   placeholder="e.g. TXN-284729"
                   required
                 />
-                {errors.transactionId && (
+                {touched.transactionId && errors.transactionId && (
                   <p className="text-xs text-rose-400">{errors.transactionId}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Customer Name</label>
+                <label className="block text-sm font-medium" htmlFor="customerEmail">
+                  Customer Email <span className="text-rose-300">*</span>
+                </label>
                 <input
-                  type="text"
-                  value={form.customerName}
-                  onChange={(event) => handleChange("customerName", event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                  placeholder="Full name"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Customer Email</label>
-                <input
+                  id="customerEmail"
                   type="email"
                   value={form.customerEmail}
                   onChange={(event) => handleChange("customerEmail", event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  onBlur={() => handleBlur("customerEmail")}
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
                   placeholder="customer@example.com"
+                  required
                 />
-                {errors.customerEmail && (
+                {touched.customerEmail && errors.customerEmail && (
                   <p className="text-xs text-rose-400">{errors.customerEmail}</p>
                 )}
               </div>
 
-              
-            </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium" htmlFor="reason">
+                  Reason for Dispute <span className="text-rose-300">*</span>
+                </label>
+                <select
+                  id="reason"
+                  value={form.reason}
+                  onChange={(event) => handleChange("reason", event.target.value)}
+                  onBlur={() => handleBlur("reason")}
+                  className="w-full appearance-none rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  required
+                >
+                  <option value="" disabled hidden>
+                    Select a reason
+                  </option>
+                  <option value="Product not received">Product not received</option>
+                  <option value="Service issue">Service issue</option>
+                  <option value="Duplicate charge">Duplicate charge</option>
+                  <option value="Unauthorized charge">Unauthorized charge</option>
+                  <option value="Fraud">Fraud</option>
+                  <option value="Other">Other</option>
+                </select>
+                {touched.reason && errors.reason && (
+                  <p className="text-xs text-rose-400">{errors.reason}</p>
+                )}
+              </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Description / Explanation</label>
-              <textarea
-                value={form.description}
-                onChange={(event) => handleChange("description", event.target.value)}
-                className="min-h-[120px] w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                placeholder="Share any supporting context, reference numbers, or agent notes."
-              />
-            </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium" htmlFor="description">
+                  Description / Explanation
+                </label>
+                <textarea
+                  id="description"
+                  value={form.description}
+                  onChange={(event) => handleChange("description", event.target.value)}
+                  onBlur={() => handleBlur("description")}
+                  className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  placeholder="Provide helpful details to speed up our investigation."
+                />
+              </div>
 
-            <div className="space-y-2">
-              <label className="block text-sm font-medium">Upload Proof</label>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  handleChange("proofFileName", file ? file.name : "");
-                }}
-                className="w-full cursor-pointer rounded-xl border border-dashed border-white/20 bg-slate-900/50 px-4 py-5 text-sm text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-500 file:px-4 file:py-2 file:text-white hover:border-brand-400/50"
-              />
-              {form.proofFileName && (
-                <p className="text-xs text-slate-400">Selected file: {form.proofFileName}</p>
-              )}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium" htmlFor="proof">
+                  Upload Proof
+                </label>
+                <input
+                  key={fileInputKey}
+                  id="proof"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.pdf"
+                  onChange={handleFileChange}
+                  className="w-full cursor-pointer rounded-2xl border border-dashed border-white/20 bg-slate-950/40 px-4 py-5 text-sm text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-brand-500 file:px-4 file:py-2 file:text-white hover:border-brand-400/60"
+                />
+                <p className="text-xs text-slate-400">Max 5MB. Accepted formats: JPG, PNG, PDF.</p>
+                {form.proofFileName && !errors.proofFileName && (
+                  <p className="text-xs text-slate-300">Selected file: {form.proofFileName}</p>
+                )}
+                {errors.proofFileName && (
+                  <p className="text-xs text-rose-400">{errors.proofFileName}</p>
+                )}
+              </div>
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-xs text-slate-400">Fields marked with * are required.</p>
+              <p className="text-xs text-slate-400">* Required information</p>
               <button
                 type="submit"
-                className="inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+                disabled={!isFormValid}
+                className="inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition focus:outline-none focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 focus:ring-offset-slate-950 hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-brand-500/50 disabled:text-white/70"
               >
-                Submit Refund Request
+                Submit refund request
               </button>
             </div>
           </form>
         </section>
-
-        {confirmation && (
-          <section className="mx-auto w-full max-w-3xl rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-emerald-50 shadow-lg sm:p-8">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="text-xl font-semibold">Refund Submitted</h2>
-              <div className="text-xs uppercase tracking-[0.2em] text-emerald-200">{confirmation.submittedAt}</div>
-            </div>
-            <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-emerald-200/80">Refund ID</dt>
-                <dd className="font-medium text-white">{confirmation.refundId}</dd>
-              </div>
-              <div>
-                <dt className="text-emerald-200/80">Transaction ID</dt>
-                <dd className="font-medium text-white">{confirmation.transactionId}</dd>
-              </div>
-              {confirmation.customerName && (
-                <div>
-                  <dt className="text-emerald-200/80">Customer</dt>
-                  <dd className="font-medium text-white">{confirmation.customerName}</dd>
-                </div>
-              )}
-              {confirmation.customerEmail && (
-                <div>
-                  <dt className="text-emerald-200/80">Email</dt>
-                  <dd className="font-medium text-white">{confirmation.customerEmail}</dd>
-                </div>
-              )}
-              {confirmation.description && (
-                <div className="sm:col-span-2">
-                  <dt className="text-emerald-200/80">Description</dt>
-                  <dd className="font-medium text-white">{confirmation.description}</dd>
-                </div>
-              )}
-              {confirmation.proofFileName && (
-                <div className="sm:col-span-2">
-                  <dt className="text-emerald-200/80">Proof</dt>
-                  <dd className="font-medium text-white">{confirmation.proofFileName}</dd>
-                </div>
-              )}
-            </dl>
-          </section>
-        )}
       </div>
     </main>
   );
