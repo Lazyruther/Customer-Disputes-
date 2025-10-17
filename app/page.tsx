@@ -43,6 +43,7 @@ const initialTouched: TouchedFields = {
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+const MIN_DESCRIPTION_LENGTH = 20;
 const requiredFields: (keyof RefundFormData)[] = ["transactionId", "customerEmail", "reason"];
 
 type IconProps = ComponentPropsWithoutRef<"svg">;
