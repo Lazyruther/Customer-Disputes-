@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import CursorTrail from '@/components/CursorTrail';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="bg-slate-950 text-slate-100 antialiased">
         <div className="relative isolate min-h-screen overflow-hidden">
+          <CursorTrail />
           <div className="pointer-events-none absolute inset-0 -z-10">
             <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900" />
             <div className="absolute -top-40 left-1/2 h-[42rem] w-[42rem] -translate-x-1/2 rounded-full bg-brand-500/20 blur-3xl" />
