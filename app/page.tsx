@@ -159,6 +159,8 @@ export default function RefundRequestPage() {
   const [touched, setTouched] = useState<TouchedFields>(initialTouched);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
+  const [proofPreview, setProofPreview] = useState<string | null>(null);
+  const [previewLoaded, setPreviewLoaded] = useState(false);
   const [isReasonMenuOpen, setIsReasonMenuOpen] = useState(false);
   const reasonMenuRef = useRef<HTMLDivElement | null>(null);
   const fileIconType = useMemo(() => getFileIconType(form.proofFileName), [form.proofFileName]);
@@ -272,6 +274,8 @@ export default function RefundRequestPage() {
 
     if (!file) {
       setForm((prev) => ({ ...prev, proofFileName: "" }));
+      setProofPreview(null);
+      setPreviewLoaded(false);
       setErrors((prev) => {
         const next = { ...prev };
         delete next.proofFileName;
@@ -283,6 +287,8 @@ export default function RefundRequestPage() {
     if (file.size > MAX_FILE_SIZE) {
       setErrors((prev) => ({ ...prev, proofFileName: "File must be 5MB or smaller." }));
       setForm((prev) => ({ ...prev, proofFileName: "" }));
+      setProofPreview(null);
+      setPreviewLoaded(false);
       setFileInputKey((prev) => prev + 1);
       return;
     }
@@ -293,7 +299,32 @@ export default function RefundRequestPage() {
       return next;
     });
     setForm((prev) => ({ ...prev, proofFileName: file.name }));
+
+    if (file.type.startsWith("image/")) {
+      setPreviewLoaded(false);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setProofPreview(typeof reader.result === "string" ? reader.result : null);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setProofPreview(null);
+      setPreviewLoaded(false);
+    }
   }
+
+  const handleRemoveFile = useCallback(() => {
+    setForm((prev) => ({ ...prev, proofFileName: "" }));
+    setProofPreview(null);
+    setPreviewLoaded(false);
+    setTouched((prev) => ({ ...prev, proofFileName: false }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      delete next.proofFileName;
+      return next;
+    });
+    setFileInputKey((prev) => prev + 1);
+  }, []);
 
   function validateForm() {
     const nextErrors: FormErrors = {};
@@ -348,6 +379,8 @@ export default function RefundRequestPage() {
       return next;
     });
     setFileInputKey((prev) => prev + 1);
+    setProofPreview(null);
+    setPreviewLoaded(false);
   }
 
   return (
@@ -558,20 +591,64 @@ export default function RefundRequestPage() {
                   className="w-full cursor-pointer rounded-2xl border border-dashed border-white/20 bg-slate-950/40 px-4 py-5 text-sm text-slate-300 transition duration-200 ease-in-out hover:border-brand-400/60 hover:bg-slate-950/60 file:mr-4 file:rounded-xl file:border-0 file:bg-brand-500 file:px-4 file:py-2 file:text-white"
                 />
                 <p className="text-xs text-slate-400">Max 5MB. Accepted formats: JPG, PNG, PDF.</p>
-                {form.proofFileName && !errors.proofFileName && (
-                  <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-slate-950/50 px-3 py-2 text-xs text-slate-200">
-                    {fileIconType === "image" ? (
-                      <ImageIcon className="h-4 w-4 text-brand-300" />
-                    ) : fileIconType === "pdf" ? (
-                      <FilePdfIcon className="h-4 w-4 text-rose-300" />
-                    ) : (
-                      <FileTextIcon className="h-4 w-4 text-slate-300" />
-                    )}
-                    <span className="truncate" title={form.proofFileName}>
-                      {form.proofFileName}
-                    </span>
-                  </div>
-                )}
+                <div className="flex items-center gap-3">
+                  {form.proofFileName ? (
+                    <button
+                      type="button"
+                      onClick={handleRemoveFile}
+                      className="group relative flex h-24 w-24 items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 shadow-lg transition duration-200 ease-in-out hover:-translate-y-0.5 hover:border-brand-400/60 focus:outline-none focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+                      aria-label={proofPreview ? "Remove uploaded image" : "Remove uploaded file"}
+                    >
+                      {proofPreview ? (
+                        <>
+                          <img
+                            src={proofPreview}
+                            alt="Uploaded proof preview"
+                            onLoad={() => setPreviewLoaded(true)}
+                            className={`h-full w-full object-cover transition-opacity duration-300 ${
+                              previewLoaded ? "opacity-100" : "opacity-0"
+                            }`}
+                          />
+                          <span className="pointer-events-none absolute inset-x-3 bottom-3 rounded-full bg-slate-950/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-200 opacity-0 transition duration-200 ease-in-out group-hover:opacity-100">
+                            Click to remove
+                          </span>
+                        </>
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-slate-300 transition duration-200 ease-in-out group-hover:text-brand-200">
+                          {fileIconType === "pdf" ? (
+                            <FilePdfIcon className="h-8 w-8 text-rose-300" />
+                          ) : (
+                            <FileTextIcon className="h-8 w-8 text-slate-300" />
+                          )}
+                          <span className="pointer-events-none absolute inset-x-3 bottom-3 rounded-full bg-slate-950/70 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-200 opacity-0 transition duration-200 ease-in-out group-hover:opacity-100">
+                            Click to remove
+                          </span>
+                        </div>
+                      )}
+                    </button>
+                  ) : (
+                    <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-dashed border-white/15 bg-slate-950/40 text-slate-500 shadow-inner">
+                      <ImageIcon className="h-8 w-8" />
+                    </div>
+                  )}
+                  {form.proofFileName && !errors.proofFileName ? (
+                    <div className="flex-1 rounded-xl border border-white/5 bg-slate-950/50 px-3 py-2 text-xs text-slate-200">
+                      <div className="flex items-center gap-2">
+                        {proofPreview ? (
+                          <ImageIcon className="h-4 w-4 text-brand-300" />
+                        ) : fileIconType === "pdf" ? (
+                          <FilePdfIcon className="h-4 w-4 text-rose-300" />
+                        ) : (
+                          <FileTextIcon className="h-4 w-4 text-slate-300" />
+                        )}
+                        <span className="truncate" title={form.proofFileName}>
+                          {form.proofFileName}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[10px] text-slate-400">Click the preview to remove and upload a different file.</p>
+                    </div>
+                  ) : null}
+                </div>
                 {errors.proofFileName && (
                   <p className="text-xs text-rose-400">{errors.proofFileName}</p>
                 )}
