@@ -62,6 +62,86 @@ function CheckCircleIcon(props: IconProps) {
   );
 }
 
+function FileTextIcon(props: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+      <path d="M14 3v6h6" />
+      <path d="M16 13H8" />
+      <path d="M16 17H8" />
+    </svg>
+  );
+}
+
+function ImageIcon(props: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <rect x="3" y="5" width="18" height="14" rx="2" />
+      <circle cx="8" cy="10" r="1.5" />
+      <path d="m21 15-3.5-3.5a2 2 0 0 0-2.9 0L7 20" />
+    </svg>
+  );
+}
+
+function FilePdfIcon(props: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+      <path d="M14 3v6h6" />
+      <path d="M8.5 17v-4H11" />
+      <path d="M8.5 15H11" />
+      <path d="M12.5 13v4" />
+      <path d="M12.5 15H14" />
+      <path d="M15.5 17v-4h2a1 1 0 0 1 0 2h-2" />
+    </svg>
+  );
+}
+
+function getFileIconType(fileName: string) {
+  const extension = fileName.split(".").pop()?.toLowerCase();
+
+  if (!extension) {
+    return "file" as const;
+  }
+
+  if (["jpg", "jpeg", "png", "gif", "bmp", "webp"].includes(extension)) {
+    return "image" as const;
+  }
+
+  if (extension === "pdf") {
+    return "pdf" as const;
+  }
+
+  return "file" as const;
+}
+
 const reasonOptions = [
   "Product not received",
   "Service issue",
@@ -81,6 +161,7 @@ export default function RefundRequestPage() {
   const [fileInputKey, setFileInputKey] = useState(0);
   const [isReasonMenuOpen, setIsReasonMenuOpen] = useState(false);
   const reasonMenuRef = useRef<HTMLDivElement | null>(null);
+  const fileIconType = useMemo(() => getFileIconType(form.proofFileName), [form.proofFileName]);
 
   const emailPattern = useMemo(
     () =>
@@ -478,7 +559,18 @@ export default function RefundRequestPage() {
                 />
                 <p className="text-xs text-slate-400">Max 5MB. Accepted formats: JPG, PNG, PDF.</p>
                 {form.proofFileName && !errors.proofFileName && (
-                  <p className="text-xs text-slate-300">Selected file: {form.proofFileName}</p>
+                  <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-slate-950/50 px-3 py-2 text-xs text-slate-200">
+                    {fileIconType === "image" ? (
+                      <ImageIcon className="h-4 w-4 text-brand-300" />
+                    ) : fileIconType === "pdf" ? (
+                      <FilePdfIcon className="h-4 w-4 text-rose-300" />
+                    ) : (
+                      <FileTextIcon className="h-4 w-4 text-slate-300" />
+                    )}
+                    <span className="truncate" title={form.proofFileName}>
+                      {form.proofFileName}
+                    </span>
+                  </div>
                 )}
                 {errors.proofFileName && (
                   <p className="text-xs text-rose-400">{errors.proofFileName}</p>
