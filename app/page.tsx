@@ -115,7 +115,7 @@ export default function RefundRequestPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+    <main className="px-4 py-10 text-white">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
         <header className="text-center">
           <h1 className="text-3xl font-semibold sm:text-4xl">Refund Request Form</h1>
