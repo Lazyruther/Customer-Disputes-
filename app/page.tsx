@@ -145,7 +145,7 @@ function getFileIconType(fileName: string) {
 const reasonOptions = [
   "Product not received",
   "Product doesn't work",
-  "Service issue",
+  "General service issue",
   "Duplicate charge",
   "Unauthorized charge",
   "Fraud",
