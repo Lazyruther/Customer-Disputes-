@@ -191,7 +191,7 @@ export default function RefundRequestPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-12 text-slate-100">
+    <main className="min-h-screen px-4 py-12 text-slate-100">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
         <header className="text-center">
           <h1 className="text-3xl font-semibold sm:text-4xl">Customer Dispute Form</h1>
