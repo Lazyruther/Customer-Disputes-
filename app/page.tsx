@@ -44,67 +44,6 @@ const requiredFields: (keyof RefundFormData)[] = ["transactionId", "customerEmai
 
 type IconProps = ComponentPropsWithoutRef<"svg">;
 
-type HighlightCard = {
-  title: string;
-  description: string;
-  Icon: (props: IconProps) => JSX.Element;
-};
-
-function ShieldIcon(props: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      <path d="M12 3 4.5 6v5.5c0 4.9 3.3 9.7 7.5 10.5 4.2-.8 7.5-5.6 7.5-10.5V6L12 3Z" />
-      <path d="m9 12.5 2.2 2.3L15 11" />
-    </svg>
-  );
-}
-
-function ClockIcon(props: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 2" />
-    </svg>
-  );
-}
-
-function ConversationIcon(props: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      {...props}
-    >
-      <path d="M5 5h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-4 4v-4H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
-      <path d="M8 9h8" />
-      <path d="M8 13h5" />
-    </svg>
-  );
-}
-
 function CheckCircleIcon(props: IconProps) {
   return (
     <svg
@@ -123,24 +62,6 @@ function CheckCircleIcon(props: IconProps) {
   );
 }
 
-const highlightCards: HighlightCard[] = [
-  {
-    title: "Secure evidence handling",
-    description: "All uploaded proof is encrypted and routed only to the specialists assigned to your case.",
-    Icon: ShieldIcon
-  },
-  {
-    title: "Response within 48 hours",
-    description: "Real-time routing ensures our compliance team reviews every submission in under two business days.",
-    Icon: ClockIcon
-  },
-  {
-    title: "Dedicated dispute guidance",
-    description: "Chat with our agents for tailored next steps while your investigation is progressing.",
-    Icon: ConversationIcon
-  }
-];
-
 const reasonOptions = [
   "Product not received",
   "Service issue",
@@ -158,7 +79,6 @@ export default function RefundRequestPage() {
   const [touched, setTouched] = useState<TouchedFields>(initialTouched);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
-  const [activeHighlight, setActiveHighlight] = useState<string>(highlightCards[0]?.title ?? "");
   const [isReasonMenuOpen, setIsReasonMenuOpen] = useState(false);
   const reasonMenuRef = useRef<HTMLDivElement | null>(null);
 
@@ -358,60 +278,6 @@ export default function RefundRequestPage() {
             Submit refund details quickly so our compliance team can review and act fast.
           </p>
         </header>
-
-        <section
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-          aria-label="Dispute assistance highlights"
-        >
-          {highlightCards.map(({ title, description, Icon }) => {
-            const isActive = title === activeHighlight;
-            return (
-              <button
-                key={title}
-                type="button"
-                onClick={() => setActiveHighlight(title)}
-                onFocus={() => setActiveHighlight(title)}
-                onMouseEnter={() => setActiveHighlight(title)}
-                className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/40 p-6 text-left transition-transform duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 active:scale-95 ${
-                  isActive
-                    ? "border-brand-400/60 bg-slate-900/70 shadow-lg shadow-brand-900/40"
-                    : "hover:-translate-y-1 hover:scale-[1.02] hover:border-brand-400/50 hover:bg-slate-900/60 hover:shadow-lg hover:shadow-brand-900/30"
-                }`}
-                aria-pressed={isActive}
-              >
-                <span
-                  className={`pointer-events-none absolute -inset-px bg-gradient-to-br from-brand-500/0 via-white/5 to-white/0 opacity-0 transition duration-500 ease-out ${
-                    isActive ? "opacity-100" : "group-hover:opacity-100"
-                  }`}
-                  aria-hidden="true"
-                />
-                <div className="relative flex items-start gap-4">
-                  <span
-                    className={`icon-float relative flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-100 transition duration-500 ease-out ${
-                      isActive ? "icon-pop" : ""
-                    }`}
-                  >
-                    <span
-                      className={`absolute inset-0 rounded-2xl bg-gradient-to-br from-brand-500/40 via-brand-500/10 to-transparent opacity-0 transition duration-500 ease-out ${
-                        isActive
-                          ? "opacity-100"
-                          : "group-hover:opacity-100 group-focus-visible:opacity-100"
-                      }`}
-                      aria-hidden="true"
-                    />
-                    <Icon
-                      className="relative h-6 w-6 transition duration-500 ease-out group-hover:-translate-y-0.5 group-hover:rotate-3 group-hover:scale-110 group-focus-visible:-translate-y-0.5 group-focus-visible:-rotate-3 group-focus-visible:scale-110"
-                    />
-                  </span>
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold text-white">{title}</p>
-                    <p className="text-xs text-slate-300">{description}</p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </section>
 
         {successMessage && (
           <button
