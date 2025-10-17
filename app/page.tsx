@@ -15,6 +15,7 @@ type RefundFormData = {
   transactionId: string;
   customerEmail: string;
   reason: string;
+  otherReasonDetails: string;
   description: string;
   proofFileName: string;
 };
@@ -27,6 +28,7 @@ const initialForm: RefundFormData = {
   transactionId: "",
   customerEmail: "",
   reason: "",
+  otherReasonDetails: "",
   description: "",
   proofFileName: ""
 };
@@ -35,6 +37,7 @@ const initialTouched: TouchedFields = {
   transactionId: false,
   customerEmail: false,
   reason: false,
+  otherReasonDetails: false,
   description: false,
   proofFileName: false
 };
@@ -180,6 +183,8 @@ export default function RefundRequestPage() {
     return reasonOptions.find((option) => option === form.reason) ?? "";
   }, [form.reason]);
 
+  const isOtherReasonSelected = selectedReason === "Other";
+
   const markReasonTouched = useCallback((value: string) => {
     setTouched((prev) => ({ ...prev, reason: true }));
     setErrors((prev) => {
@@ -235,6 +240,11 @@ export default function RefundRequestPage() {
           return "Choose a reason for the dispute.";
         }
         break;
+      case "otherReasonDetails":
+        if (form.reason === "Other" && !trimmed) {
+          return "Provide additional details for the dispute.";
+        }
+        break;
       default:
         break;
     }
@@ -257,8 +267,33 @@ export default function RefundRequestPage() {
 
   function handleChange<T extends keyof RefundFormData>(field: T, value: RefundFormData[T]) {
     setSuccessMessage(null);
-    setForm((prev) => ({ ...prev, [field]: value }));
-    setTouched((prev) => ({ ...prev, [field]: true }));
+    setForm((prev) => {
+      if (field === "reason") {
+        const next = { ...prev, reason: value as RefundFormData["reason"] };
+        if (value !== "Other") {
+          next.otherReasonDetails = "";
+        }
+        return next;
+      }
+      return { ...prev, [field]: value };
+    });
+    setTouched((prev) => {
+      if (field === "reason") {
+        return {
+          ...prev,
+          reason: true,
+          otherReasonDetails: value === "Other" ? prev.otherReasonDetails : false
+        };
+      }
+      return { ...prev, [field]: true };
+    });
+    if (field === "reason" && value !== "Other") {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.otherReasonDetails;
+        return next;
+      });
+    }
     updateFieldError(field, value);
   }
 
@@ -337,15 +372,31 @@ export default function RefundRequestPage() {
       }
     });
 
+    if (form.reason === "Other") {
+      const otherReasonError = getFieldError("otherReasonDetails", form.otherReasonDetails);
+      if (otherReasonError) {
+        nextErrors.otherReasonDetails = otherReasonError;
+      }
+    }
+
     setErrors((prev) => {
       const updated: FormErrors = { ...prev };
       requiredFields.forEach((field) => {
         delete updated[field];
       });
+      if (form.reason !== "Other") {
+        delete updated.otherReasonDetails;
+      }
       return { ...updated, ...nextErrors };
     });
 
-    setTouched((prev) => ({ ...prev, transactionId: true, customerEmail: true, reason: true }));
+    setTouched((prev) => ({
+      ...prev,
+      transactionId: true,
+      customerEmail: true,
+      reason: true,
+      otherReasonDetails: form.reason === "Other" ? true : prev.otherReasonDetails
+    }));
 
     return Object.keys(nextErrors).length === 0 && !errors.proofFileName;
   }
@@ -564,6 +615,26 @@ export default function RefundRequestPage() {
                   <p className="text-xs text-rose-400">{errors.reason}</p>
                 )}
               </div>
+              {isOtherReasonSelected && (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium" htmlFor="other-details">
+                    Brief description <span className="text-rose-300">*</span>
+                  </label>
+                  <textarea
+                    id="other-details"
+                    value={form.otherReasonDetails}
+                    onChange={(event) => handleChange("otherReasonDetails", event.target.value)}
+                    onBlur={() => handleBlur("otherReasonDetails")}
+                    rows={3}
+                    className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 transition duration-200 ease-in-out focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 hover:border-brand-300/60"
+                    placeholder="Tell us briefly why you're disputing the charge."
+                    required
+                  />
+                  {touched.otherReasonDetails && errors.otherReasonDetails && (
+                    <p className="text-xs text-rose-400">{errors.otherReasonDetails}</p>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="block text-sm font-medium" htmlFor="description">
