@@ -197,6 +197,7 @@ export default function RefundRequestPage() {
   }, [form.reason]);
 
   const isOtherReasonSelected = selectedReason === "Other";
+  const descriptionSizeClass = isOtherReasonSelected ? "min-h-[96px]" : "min-h-[160px]";
 
   const markReasonTouched = useCallback((value: string) => {
     setTouched((prev) => ({ ...prev, reason: true }));
@@ -672,7 +673,7 @@ export default function RefundRequestPage() {
                   onBlur={() => handleBlur("description")}
                   minLength={MIN_DESCRIPTION_LENGTH}
                   required
-                  className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 transition duration-200 ease-in-out focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 hover:border-brand-300/60"
+                  className={`${descriptionSizeClass} w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 transition-all duration-200 ease-in-out focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 hover:border-brand-300/60`}
                   placeholder="Provide helpful details to speed up our investigation."
                   aria-invalid={touched.description && !!errors.description}
                   aria-describedby={descriptionAriaDescribedBy}
