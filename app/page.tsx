@@ -645,6 +645,8 @@ export default function RefundRequestPage() {
                   value={form.description}
                   onChange={(event) => handleChange("description", event.target.value)}
                   onBlur={() => handleBlur("description")}
+                  minLength={MIN_DESCRIPTION_LENGTH}
+                  required
                   className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 transition duration-200 ease-in-out focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 hover:border-brand-300/60"
                   placeholder="Provide helpful details to speed up our investigation."
                 />
