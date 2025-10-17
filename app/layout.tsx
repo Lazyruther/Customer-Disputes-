@@ -29,11 +29,22 @@ export default function RootLayout({
 
           <div className="relative z-10">
             <div className="container py-10">
-              <header className="mb-12 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <h1 className="text-4xl font-semibold tracking-tight text-white md:text-5xl">
-                    Refund & Dispute Center
-                  </h1>
+              <header className="mb-12 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+                <div className="max-w-2xl space-y-4">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-medium uppercase tracking-[0.35em] text-slate-200/80">
+                    Customer Success Command
+                  </span>
+                  <div>
+                    <h1 className="text-4xl font-semibold tracking-tight text-transparent md:text-5xl">
+                      <span className="bg-gradient-to-r from-white via-sky-100 to-brand-400 bg-clip-text">
+                        Refund & Dispute Centre
+                      </span>
+                    </h1>
+                    <p className="mt-4 text-base text-slate-300 md:text-lg">
+                      Streamline customer reimbursements, track open disputes and empower your teams with
+                      real-time context for every case.
+                    </p>
+                  </div>
                 </div>
               </header>
               {children}
