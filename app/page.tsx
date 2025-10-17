@@ -1,111 +1,358 @@
-import { Suspense } from 'react';
-import { prisma } from '@/lib/prisma';
-import { DisputeCard, DisputeCardProps } from '@/components/DisputeCard';
+"use client";
 
-async function getDisputes(): Promise<DisputeCardProps[]> {
-  const fallback: DisputeCardProps[] = [
-    {
-      id: 1,
-      customerName: 'Ayesha Castillo',
-      issue: 'Chargeback on invoice #1043 with missing supporting documentation.',
-      status: 'OPEN',
-      createdAt: new Date('2024-04-22T13:20:00Z'),
-      updatedAt: new Date('2024-04-28T08:15:00Z')
-    },
-    {
-      id: 2,
-      customerName: 'Lucien Becker',
-      issue: 'Disputed overdraft fees tied to ACH reversal with bank partner.',
-      status: 'IN_PROGRESS',
-      createdAt: new Date('2024-04-10T09:35:00Z'),
-      updatedAt: new Date('2024-04-27T17:48:00Z')
-    },
-    {
-      id: 3,
-      customerName: 'Veronica Mendez',
-      issue: 'Duplicate payment detected after settlement batch retry.',
-      status: 'RESOLVED',
-      createdAt: new Date('2024-03-18T11:05:00Z'),
-      updatedAt: new Date('2024-04-22T10:42:00Z')
-    }
-  ];
+import { FormEvent, useMemo, useState } from "react";
 
-  try {
-    const disputes = await prisma.dispute.findMany({
-      orderBy: { createdAt: 'desc' }
-    });
+type PaymentMethod = "Card" | "Crypto" | "Wallet" | "Bank";
+type RefundType = "Full" | "Partial" | "Chargeback";
+type RefundReason =
+  | "Product not received"
+  | "Dissatisfied"
+  | "Duplicate charge"
+  | "Fraudulent"
+  | "Unauthorized"
+  | "Other";
 
-    if (!disputes.length) {
-      return fallback;
-    }
+type RefundFormData = {
+  transactionId: string;
+  orderId: string;
+  customerName: string;
+  customerEmail: string;
+  paymentMethod: PaymentMethod;
+  refundType: RefundType;
+  refundAmount: string;
+  reason: RefundReason;
+  description: string;
+  proofFileName: string;
+};
 
-    return disputes.map((dispute) => ({
-      ...dispute,
-      status: dispute.status as DisputeCardProps['status']
-    }));
-  } catch (error) {
-    console.warn('Falling back to static disputes due to Prisma error:', error);
-    return fallback;
+type FormErrors = Partial<Record<keyof RefundFormData, string>> & {
+  customerEmail?: string;
+};
+
+type RefundConfirmation = RefundFormData & {
+  refundId: string;
+  submittedAt: string;
+};
+
+const initialForm: RefundFormData = {
+  transactionId: "",
+  orderId: "",
+  customerName: "",
+  customerEmail: "",
+  paymentMethod: "Card",
+  refundType: "Full",
+  refundAmount: "",
+  reason: "Product not received",
+  description: "",
+  proofFileName: ""
+};
+
+export default function RefundRequestPage() {
+  const [form, setForm] = useState<RefundFormData>(initialForm);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [confirmation, setConfirmation] = useState<RefundConfirmation | null>(null);
+
+  const emailPattern = useMemo(
+    () =>
+      /^(?:[a-zA-Z0-9_'^&+{}=!-]+(?:\.[a-zA-Z0-9_'^&+{}=!-]+)*|"(?:[^"\\]|\\.)+")@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/,
+    []
+  );
+
+  function handleChange<T extends keyof RefundFormData>(field: T, value: RefundFormData[T]) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    setErrors((prev) => ({ ...prev, [field]: undefined }));
   }
-}
 
-async function DisputeList() {
-  const disputes = await getDisputes();
-  return (
-    <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-      {disputes.map((dispute) => (
-        <DisputeCard key={dispute.id} {...dispute} />
-      ))}
-    </section>
-  );
-}
+  function validate(): boolean {
+    const nextErrors: FormErrors = {};
 
-function DashboardSkeleton() {
-  return (
-    <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div
-          key={index}
-          className="h-48 animate-pulse rounded-xl border border-white/5 bg-white/5/30"
-        />
-      ))}
-    </section>
-  );
-}
+    if (!form.transactionId.trim()) {
+      nextErrors.transactionId = "Transaction ID is required.";
+    }
 
-export default async function Home() {
+    if (form.customerEmail.trim() && !emailPattern.test(form.customerEmail.trim())) {
+      nextErrors.customerEmail = "Enter a valid email address.";
+    }
+
+    if (!form.refundAmount.trim()) {
+      nextErrors.refundAmount = "Refund amount is required.";
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!validate()) {
+      return;
+    }
+
+    const refundId = `RF-${Date.now().toString(36).toUpperCase()}`;
+    const submittedAt = new Date().toISOString();
+
+    const submission: RefundConfirmation = {
+      ...form,
+      refundId,
+      submittedAt
+    };
+
+    try {
+      if (typeof window !== "undefined") {
+        const historyKey = "refundSubmissions";
+        const existing = window.localStorage.getItem(historyKey);
+        const history = existing ? JSON.parse(existing) : [];
+        history.unshift(submission);
+        window.localStorage.setItem(historyKey, JSON.stringify(history.slice(0, 20)));
+      }
+    } catch (storageError) {
+      console.warn("Unable to persist submission to localStorage", storageError);
+    }
+
+    setConfirmation(submission);
+    setForm(initialForm);
+  }
+
   return (
-    <main className="space-y-10">
-      <section className="grid gap-6 rounded-2xl border border-white/5 bg-white/5 p-8 backdrop-blur">
-        <div className="grid gap-2">
-          <h2 className="text-2xl font-semibold text-white">Dispute Overview</h2>
-          <p className="text-sm text-slate-300">
-            Track dispute velocity and resolution trends with live data streaming from the Postgres
-            datastore via Prisma ORM.
+    <main className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
+        <header className="text-center">
+          <h1 className="text-3xl font-semibold sm:text-4xl">Refund Request Form</h1>
+          <p className="mt-2 text-sm text-slate-300">
+            Submit refund details quickly so our compliance team can review and act fast.
           </p>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-xl border border-brand-500/20 bg-brand-500/10 p-5 text-brand-100">
-            <p className="text-sm uppercase tracking-[0.2em]">Open Cases</p>
-            <p className="mt-3 text-4xl font-semibold">18</p>
-            <p className="mt-2 text-xs text-brand-200/80">+3 vs last week</p>
-          </div>
-          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-5 text-emerald-100">
-            <p className="text-sm uppercase tracking-[0.2em]">Resolved</p>
-            <p className="mt-3 text-4xl font-semibold">64</p>
-            <p className="mt-2 text-xs text-emerald-200/80">92% within SLA</p>
-          </div>
-          <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-5 text-amber-100">
-            <p className="text-sm uppercase tracking-[0.2em]">Backlog Age</p>
-            <p className="mt-3 text-4xl font-semibold">4.6d</p>
-            <p className="mt-2 text-xs text-amber-200/80">Down 12% week over week</p>
-          </div>
-        </div>
-      </section>
+        </header>
 
-      <Suspense fallback={<DashboardSkeleton />}>
-        <DisputeList />
-      </Suspense>
+        <section className="mx-auto w-full max-w-3xl rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur-md sm:p-10">
+          <form className="space-y-6" onSubmit={handleSubmit} noValidate>
+            <div className="grid gap-6 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Transaction ID *</label>
+                <input
+                  type="text"
+                  value={form.transactionId}
+                  onChange={(event) => handleChange("transactionId", event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  placeholder="e.g. TXN-284729"
+                  required
+                />
+                {errors.transactionId && (
+                  <p className="text-xs text-rose-400">{errors.transactionId}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Order ID</label>
+                <input
+                  type="text"
+                  value={form.orderId}
+                  onChange={(event) => handleChange("orderId", event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  placeholder="Optional order reference"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Customer Name</label>
+                <input
+                  type="text"
+                  value={form.customerName}
+                  onChange={(event) => handleChange("customerName", event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  placeholder="Full name"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Customer Email</label>
+                <input
+                  type="email"
+                  value={form.customerEmail}
+                  onChange={(event) => handleChange("customerEmail", event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  placeholder="customer@example.com"
+                />
+                {errors.customerEmail && (
+                  <p className="text-xs text-rose-400">{errors.customerEmail}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Payment Method</label>
+                <select
+                  value={form.paymentMethod}
+                  onChange={(event) => handleChange("paymentMethod", event.target.value as PaymentMethod)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                >
+                  {(["Card", "Crypto", "Wallet", "Bank"] satisfies PaymentMethod[]).map((method) => (
+                    <option key={method} value={method}>
+                      {method}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Refund Type</label>
+                <select
+                  value={form.refundType}
+                  onChange={(event) => handleChange("refundType", event.target.value as RefundType)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                >
+                  {(["Full", "Partial", "Chargeback"] satisfies RefundType[]).map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Refund Amount *</label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.refundAmount}
+                  onChange={(event) => handleChange("refundAmount", event.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  placeholder="0.00"
+                  required
+                />
+                {errors.refundAmount && (
+                  <p className="text-xs text-rose-400">{errors.refundAmount}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Reason</label>
+                <select
+                  value={form.reason}
+                  onChange={(event) => handleChange("reason", event.target.value as RefundReason)}
+                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                >
+                  {(
+                    [
+                      "Product not received",
+                      "Dissatisfied",
+                      "Duplicate charge",
+                      "Fraudulent",
+                      "Unauthorized",
+                      "Other"
+                    ] satisfies RefundReason[]
+                  ).map((reason) => (
+                    <option key={reason} value={reason}>
+                      {reason}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Description / Explanation</label>
+              <textarea
+                value={form.description}
+                onChange={(event) => handleChange("description", event.target.value)}
+                className="min-h-[120px] w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                placeholder="Share any supporting context, reference numbers, or agent notes."
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-medium">Upload Proof</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  handleChange("proofFileName", file ? file.name : "");
+                }}
+                className="w-full cursor-pointer rounded-xl border border-dashed border-white/20 bg-slate-900/50 px-4 py-5 text-sm text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-500 file:px-4 file:py-2 file:text-white hover:border-brand-400/50"
+              />
+              {form.proofFileName && (
+                <p className="text-xs text-slate-400">Selected file: {form.proofFileName}</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-slate-400">Fields marked with * are required.</p>
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 focus:ring-offset-slate-950"
+              >
+                Submit Refund Request
+              </button>
+            </div>
+          </form>
+        </section>
+
+        {confirmation && (
+          <section className="mx-auto w-full max-w-3xl rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-emerald-50 shadow-lg sm:p-8">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-xl font-semibold">Refund Submitted</h2>
+              <div className="text-xs uppercase tracking-[0.2em] text-emerald-200">{confirmation.submittedAt}</div>
+            </div>
+            <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-emerald-200/80">Refund ID</dt>
+                <dd className="font-medium text-white">{confirmation.refundId}</dd>
+              </div>
+              <div>
+                <dt className="text-emerald-200/80">Transaction ID</dt>
+                <dd className="font-medium text-white">{confirmation.transactionId}</dd>
+              </div>
+              {confirmation.orderId && (
+                <div>
+                  <dt className="text-emerald-200/80">Order ID</dt>
+                  <dd className="font-medium text-white">{confirmation.orderId}</dd>
+                </div>
+              )}
+              {confirmation.customerName && (
+                <div>
+                  <dt className="text-emerald-200/80">Customer</dt>
+                  <dd className="font-medium text-white">{confirmation.customerName}</dd>
+                </div>
+              )}
+              {confirmation.customerEmail && (
+                <div>
+                  <dt className="text-emerald-200/80">Email</dt>
+                  <dd className="font-medium text-white">{confirmation.customerEmail}</dd>
+                </div>
+              )}
+              <div>
+                <dt className="text-emerald-200/80">Payment Method</dt>
+                <dd className="font-medium text-white">{confirmation.paymentMethod}</dd>
+              </div>
+              <div>
+                <dt className="text-emerald-200/80">Refund Type</dt>
+                <dd className="font-medium text-white">{confirmation.refundType}</dd>
+              </div>
+              <div>
+                <dt className="text-emerald-200/80">Amount</dt>
+                <dd className="font-medium text-white">${Number(confirmation.refundAmount || 0).toFixed(2)}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-emerald-200/80">Reason</dt>
+                <dd className="font-medium text-white">{confirmation.reason}</dd>
+              </div>
+              {confirmation.description && (
+                <div className="sm:col-span-2">
+                  <dt className="text-emerald-200/80">Description</dt>
+                  <dd className="font-medium text-white">{confirmation.description}</dd>
+                </div>
+              )}
+              {confirmation.proofFileName && (
+                <div className="sm:col-span-2">
+                  <dt className="text-emerald-200/80">Proof</dt>
+                  <dd className="font-medium text-white">{confirmation.proofFileName}</dd>
+                </div>
+              )}
+            </dl>
+          </section>
+        )}
+      </div>
     </main>
   );
 }
