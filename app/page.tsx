@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type RefundFormData = {
   transactionId: string;
@@ -31,6 +31,19 @@ export default function RefundRequestPage() {
   const [form, setForm] = useState<RefundFormData>(initialForm);
   const [errors, setErrors] = useState<FormErrors>({});
   const [confirmation, setConfirmation] = useState<RefundConfirmation | null>(null);
+  const [refundIdCopied, setRefundIdCopied] = useState(false);
+
+  useEffect(() => {
+    if (!refundIdCopied) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setRefundIdCopied(false), 2000);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [refundIdCopied]);
 
   const emailPattern = useMemo(
     () =>
@@ -88,6 +101,28 @@ export default function RefundRequestPage() {
 
     setConfirmation(submission);
     setForm(initialForm);
+  }
+
+  async function copyRefundId(refundId: string) {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(refundId);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = refundId;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "absolute";
+        textarea.style.left = "-9999px";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+
+      setRefundIdCopied(true);
+    } catch (error) {
+      console.warn("Unable to copy refund ID", error);
+    }
   }
 
   return (
@@ -193,7 +228,33 @@ export default function RefundRequestPage() {
             <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-emerald-200/80">Refund ID</dt>
-                <dd className="font-medium text-white">{confirmation.refundId}</dd>
+                <dd className="flex items-center gap-2 font-medium text-white">
+                  <span>{confirmation.refundId}</span>
+                  <button
+                    type="button"
+                    onClick={() => copyRefundId(confirmation.refundId)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-emerald-400/40 bg-emerald-400/10 text-emerald-100 transition hover:bg-emerald-400/20 focus:outline-none focus:ring-2 focus:ring-emerald-300 focus:ring-offset-2 focus:ring-offset-emerald-900"
+                    aria-label="Copy refund ID"
+                  >
+                    <svg
+                      aria-hidden="true"
+                      className="h-4 w-4"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                    </svg>
+                    <span className="sr-only">Copy refund ID</span>
+                  </button>
+                  {refundIdCopied && (
+                    <span className="text-xs font-normal text-emerald-200">Copied!</span>
+                  )}
+                </dd>
               </div>
               <div>
                 <dt className="text-emerald-200/80">Transaction ID</dt>
