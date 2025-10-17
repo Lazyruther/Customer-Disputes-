@@ -4,6 +4,7 @@ import {
   ChangeEvent,
   ComponentPropsWithoutRef,
   FormEvent,
+  useEffect,
   useMemo,
   useState
 } from "react";
@@ -45,6 +46,23 @@ type HighlightCard = {
   title: string;
   description: string;
   Icon: (props: IconProps) => JSX.Element;
+};
+
+type LiveStat = {
+  title: string;
+  value: number;
+  unit?: string;
+  delta: string;
+  description: string;
+  completion: number;
+  accent: "emerald" | "sky" | "amber";
+};
+
+type TimelineStage = {
+  title: string;
+  eta: string;
+  description: string;
+  tip: string;
 };
 
 function ShieldIcon(props: IconProps) {
@@ -138,6 +156,83 @@ const highlightCards: HighlightCard[] = [
   }
 ];
 
+const statAccentTheme: Record<LiveStat["accent"], { active: string; idle: string; bar: string; chip: string }> = {
+  emerald: {
+    active: "border-emerald-400/60 bg-emerald-500/20 shadow-lg shadow-emerald-500/20",
+    idle: "border-white/10 bg-slate-900/60 hover:border-emerald-400/40 hover:bg-emerald-500/10",
+    bar: "from-emerald-400 via-emerald-300 to-emerald-500",
+    chip: "border border-emerald-400/40 bg-emerald-500/15 text-emerald-100"
+  },
+  sky: {
+    active: "border-sky-400/60 bg-sky-500/20 shadow-lg shadow-sky-500/20",
+    idle: "border-white/10 bg-slate-900/60 hover:border-sky-400/40 hover:bg-sky-500/10",
+    bar: "from-sky-400 via-sky-300 to-sky-500",
+    chip: "border border-sky-400/40 bg-sky-500/15 text-sky-100"
+  },
+  amber: {
+    active: "border-amber-400/60 bg-amber-500/20 shadow-lg shadow-amber-500/20",
+    idle: "border-white/10 bg-slate-900/60 hover:border-amber-400/40 hover:bg-amber-500/10",
+    bar: "from-amber-400 via-amber-300 to-amber-500",
+    chip: "border border-amber-400/40 bg-amber-500/15 text-amber-100"
+  }
+};
+
+const liveStats: LiveStat[] = [
+  {
+    title: "Active investigations",
+    value: 42,
+    delta: "+8 today",
+    description: "Compliance specialists are actively reviewing these cases with evidence attached.",
+    completion: 72,
+    accent: "emerald"
+  },
+  {
+    title: "Awaiting merchant response",
+    value: 18,
+    unit: "cases",
+    delta: "avg. 29h",
+    description: "We have contacted the merchant and are waiting on additional documentation.",
+    completion: 54,
+    accent: "amber"
+  },
+  {
+    title: "Refunds approved this week",
+    value: 31,
+    unit: "cases",
+    delta: "+14% vs last week",
+    description: "Customers have been notified and payouts are now being processed.",
+    completion: 88,
+    accent: "sky"
+  }
+];
+
+const timelineStages: TimelineStage[] = [
+  {
+    title: "Submission triage",
+    eta: "0 - 4 hours",
+    description: "An automated review checks for duplicates, validates document quality, and prioritises urgent fraud cases.",
+    tip: "Keep push notifications on so you never miss a question from our triage bot."
+  },
+  {
+    title: "Investigator assignment",
+    eta: "4 - 12 hours",
+    description: "The case is routed to a compliance specialist with experience in your industry to evaluate the evidence.",
+    tip: "Adding transaction notes speeds up the specialist’s fact-finding."
+  },
+  {
+    title: "Merchant collaboration",
+    eta: "12 - 48 hours",
+    description: "We reach out to the merchant for their records and compare them with the documents you provided.",
+    tip: "Upload receipts or screenshots that clearly show amounts and dates."
+  },
+  {
+    title: "Resolution & payout",
+    eta: "48 - 72 hours",
+    description: "Once we’ve confirmed the outcome, we release the refund and email the full case summary for your records.",
+    tip: "Track the status in your dashboard or request a call-back for complex disputes."
+  }
+];
+
 export default function RefundRequestPage() {
   const [form, setForm] = useState<RefundFormData>(initialForm);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -145,11 +240,50 @@ export default function RefundRequestPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [activeHighlight, setActiveHighlight] = useState<string>(highlightCards[0]?.title ?? "");
+  const [activeStatIndex, setActiveStatIndex] = useState(0);
+  const [activeStage, setActiveStage] = useState<string>(timelineStages[0]?.title ?? "");
+  const [evidenceConfidence, setEvidenceConfidence] = useState(68);
+  const [merchantResponseHours, setMerchantResponseHours] = useState(36);
+
+  const activeTimelineStage = useMemo(
+    () => timelineStages.find((stage) => stage.title === activeStage) ?? timelineStages[0],
+    [activeStage]
+  );
+
+  const activeStat = liveStats[activeStatIndex] ?? liveStats[0];
 
   const emailPattern = useMemo(
     () =>
       /^(?:[a-zA-Z0-9_'^&+{}=!-]+(?:\.[a-zA-Z0-9_'^&+{}=!-]+)*|"(?:[^"\\]|\\.)+")@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/,
     []
+  );
+
+  useEffect(() => {
+    if (liveStats.length <= 1) {
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      setActiveStatIndex((prev) => (prev + 1) % liveStats.length);
+    }, 6000);
+
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, []);
+
+  const responseModifier = 1 - Math.min(merchantResponseHours / 72, 1);
+  const estimatedResolutionDays = Math.max(
+    2,
+    Math.min(14, Math.round(12 - (evidenceConfidence / 100) * 5 - responseModifier * 4))
+  );
+  const approvalProbability = Math.max(
+    24,
+    Math.min(96, Math.round(45 + (evidenceConfidence / 100) * 40 + responseModifier * 8))
+  );
+  const expediteScore = Math.max(
+    10,
+    Math.min(100, Math.round(evidenceConfidence * 0.55 + responseModifier * 45))
   );
 
   const isEmailValid = form.customerEmail.trim() !== "" && emailPattern.test(form.customerEmail.trim());
@@ -358,6 +492,247 @@ export default function RefundRequestPage() {
               </button>
             );
           })}
+        </section>
+
+        <section
+          className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-2xl backdrop-blur-sm sm:p-10"
+          aria-label="Live dispute insights"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-white sm:text-2xl">Live dispute insights</h2>
+              <p className="mt-1 text-sm text-slate-300">
+                Hover or focus each widget to spotlight what our dispute desk is prioritising right now.
+              </p>
+            </div>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-4 py-2 text-xs font-semibold shadow ${statAccentTheme[activeStat.accent].chip}`}
+            >
+              Highlight • {activeStat.delta}
+            </span>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {liveStats.map((stat, index) => {
+              const isActive = index === activeStatIndex;
+              const accent = statAccentTheme[stat.accent];
+
+              return (
+                <button
+                  key={stat.title}
+                  type="button"
+                  onClick={() => setActiveStatIndex(index)}
+                  onFocus={() => setActiveStatIndex(index)}
+                  onMouseEnter={() => setActiveStatIndex(index)}
+                  className={`live-stat-card group relative flex h-full flex-col justify-between rounded-2xl border px-5 py-6 text-left transition duration-500 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 ${
+                    isActive ? `is-active ${accent.active}` : accent.idle
+                  }`}
+                  aria-pressed={isActive}
+                >
+                  <div className="relative space-y-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-white">{stat.title}</p>
+                      <span
+                        className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide ${accent.chip}`}
+                      >
+                        {stat.delta}
+                      </span>
+                    </div>
+                    <p className="text-3xl font-semibold text-white">
+                      {stat.value}
+                      {stat.unit ? (
+                        <span className="ml-1 text-base font-medium text-slate-200">{stat.unit}</span>
+                      ) : null}
+                    </p>
+                  </div>
+
+                  <div className="mt-6">
+                    <div className="progress-track relative h-2 overflow-hidden rounded-full bg-slate-800/80">
+                      <span
+                        className={`stat-progress block h-full rounded-full bg-gradient-to-r ${accent.bar}`}
+                        style={{ width: `${stat.completion}%` }}
+                        aria-hidden="true"
+                      />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-6 flex flex-col gap-3 rounded-2xl border border-white/10 bg-slate-950/40 px-5 py-4 text-sm text-slate-200 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-white">{activeStat.title}</p>
+              <p className="mt-1 max-w-xl text-slate-300">{activeStat.description}</p>
+            </div>
+            <div className="flex items-center gap-3 text-xs text-slate-300">
+              <span className="uppercase tracking-wide text-slate-400">Completion</span>
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-slate-900/60 text-sm font-semibold text-white">
+                {activeStat.completion}%
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[1.4fr,1fr]">
+          <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-2xl backdrop-blur-sm sm:p-10">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-white sm:text-2xl">Investigation journey</h2>
+                <p className="mt-1 text-sm text-slate-300">
+                  Follow your refund as it moves through each specialised review stage.
+                </p>
+              </div>
+              <span className="rounded-full border border-brand-300/40 bg-brand-500/10 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-brand-100">
+                {activeTimelineStage.eta}
+              </span>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-4 lg:flex-row">
+              <div className="flex-1 space-y-3">
+                {timelineStages.map((stage) => {
+                  const isActive = stage.title === activeStage;
+                  return (
+                    <button
+                      key={stage.title}
+                      type="button"
+                      onClick={() => setActiveStage(stage.title)}
+                      onFocus={() => setActiveStage(stage.title)}
+                      onMouseEnter={() => setActiveStage(stage.title)}
+                      className={`timeline-step group relative flex items-start gap-4 rounded-2xl border px-4 py-4 text-left transition duration-500 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 ${
+                        isActive
+                          ? "border-brand-400/60 bg-brand-500/10"
+                          : "border-white/10 hover:border-brand-400/40 hover:bg-slate-900/60"
+                      }`}
+                      aria-pressed={isActive}
+                    >
+                      <span
+                        className={`timeline-node relative mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-2xl text-sm font-semibold ${
+                          isActive
+                            ? "bg-brand-500/30 text-brand-100"
+                            : "bg-slate-800/80 text-slate-200"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        <span className="timeline-node-glow" />
+                        {stage.title
+                          .split(" ")
+                          .map((part) => part[0])
+                          .join("")}
+                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-white">{stage.title}</p>
+                        <p className="mt-1 text-xs text-slate-300">{stage.eta}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <aside className="timeline-detail relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/60 p-6 text-sm text-slate-300">
+                <span className="timeline-detail-gradient" aria-hidden="true" />
+                <h3 className="text-base font-semibold text-white">What’s happening now</h3>
+                <p className="mt-2 leading-relaxed">{activeTimelineStage.description}</p>
+                <div className="mt-4 rounded-2xl border border-brand-400/30 bg-brand-500/10 p-4 text-brand-100">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-100/80">Tip</p>
+                  <p className="mt-1 text-sm text-brand-50">{activeTimelineStage.tip}</p>
+                </div>
+              </aside>
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-2xl backdrop-blur-sm sm:p-10">
+            <h2 className="text-xl font-semibold text-white sm:text-2xl">Outcome estimator</h2>
+            <p className="mt-1 text-sm text-slate-300">
+              Adjust the sliders to simulate how evidence quality and merchant speed influence the resolution.
+            </p>
+
+            <div className="mt-6 space-y-6">
+              <div>
+                <div className="flex items-center justify-between text-sm font-medium text-white">
+                  <label htmlFor="evidence-confidence">Evidence confidence</label>
+                  <span>{evidenceConfidence}%</span>
+                </div>
+                <div className="mt-3">
+                  <input
+                    id="evidence-confidence"
+                    type="range"
+                    min={10}
+                    max={100}
+                    step={1}
+                    value={evidenceConfidence}
+                    onChange={(event) => setEvidenceConfidence(Number(event.target.value))}
+                    className="range-input"
+                  />
+                  <div className="progress-track mt-2 h-2 overflow-hidden rounded-full bg-slate-800/80">
+                    <span
+                      className="progress-glow block h-full rounded-full bg-gradient-to-r from-emerald-400 via-brand-400 to-brand-500"
+                      style={{ width: `${evidenceConfidence}%` }}
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-slate-400">
+                  Higher-quality documents reduce manual follow-ups and push your dispute closer to the front of the queue.
+                </p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between text-sm font-medium text-white">
+                  <label htmlFor="merchant-response">Merchant response speed</label>
+                  <span>{merchantResponseHours}h</span>
+                </div>
+                <div className="mt-3">
+                  <input
+                    id="merchant-response"
+                    type="range"
+                    min={12}
+                    max={72}
+                    step={4}
+                    value={merchantResponseHours}
+                    onChange={(event) => setMerchantResponseHours(Number(event.target.value))}
+                    className="range-input"
+                  />
+                  <div className="progress-track mt-2 h-2 overflow-hidden rounded-full bg-slate-800/80">
+                    <span
+                      className="progress-glow block h-full rounded-full bg-gradient-to-r from-amber-400 via-amber-300 to-amber-500"
+                      style={{ width: `${(merchantResponseHours / 72) * 100}%` }}
+                      aria-hidden="true"
+                    />
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-slate-400">
+                  The quicker the merchant responds, the faster we can reconcile evidence and approve your refund.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="stat-outcome-card rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Resolution window</p>
+                <p className="mt-2 text-2xl font-semibold text-white">
+                  {estimatedResolutionDays}-{estimatedResolutionDays + 2} days
+                </p>
+                <p className="mt-2 text-xs text-slate-400">
+                  Based on current queue depth and provided supporting evidence.
+                </p>
+              </div>
+              <div className="stat-outcome-card rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Approval likelihood</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{approvalProbability}%</p>
+                <p className="mt-2 text-xs text-slate-400">
+                  Strong documentation increases confidence in a customer-favourable outcome.
+                </p>
+              </div>
+              <div className="stat-outcome-card rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Expedite readiness</p>
+                <p className="mt-2 text-2xl font-semibold text-white">{expediteScore}</p>
+                <p className="mt-2 text-xs text-slate-400">
+                  Scores above 80 qualify for priority routing by our escalations team.
+                </p>
+              </div>
+            </div>
+          </div>
         </section>
 
         {successMessage && (
