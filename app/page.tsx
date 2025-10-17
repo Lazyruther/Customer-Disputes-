@@ -465,7 +465,7 @@ export default function RefundRequestPage() {
                   onChange={(event) => handleChange("customerEmail", event.target.value)}
                   onBlur={() => handleBlur("customerEmail")}
                   className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 transition duration-200 ease-in-out focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 hover:border-brand-300/60"
-                  placeholder="customer@example.com"
+                  placeholder="your@example.com"
                   required
                 />
                 {touched.customerEmail && errors.customerEmail && (
