@@ -2,25 +2,11 @@
 
 import { FormEvent, useMemo, useState } from "react";
 
-type PaymentMethod = "Card" | "Crypto" | "Wallet" | "Bank";
-type RefundType = "Full" | "Partial" | "Chargeback";
-type RefundReason =
-  | "Product not received"
-  | "Dissatisfied"
-  | "Duplicate charge"
-  | "Fraudulent"
-  | "Unauthorized"
-  | "Other";
-
 type RefundFormData = {
   transactionId: string;
   orderId: string;
   customerName: string;
   customerEmail: string;
-  paymentMethod: PaymentMethod;
-  refundType: RefundType;
-  refundAmount: string;
-  reason: RefundReason;
   description: string;
   proofFileName: string;
 };
@@ -39,10 +25,6 @@ const initialForm: RefundFormData = {
   orderId: "",
   customerName: "",
   customerEmail: "",
-  paymentMethod: "Card",
-  refundType: "Full",
-  refundAmount: "",
-  reason: "Product not received",
   description: "",
   proofFileName: ""
 };
@@ -72,10 +54,6 @@ export default function RefundRequestPage() {
 
     if (form.customerEmail.trim() && !emailPattern.test(form.customerEmail.trim())) {
       nextErrors.customerEmail = "Enter a valid email address.";
-    }
-
-    if (!form.refundAmount.trim()) {
-      nextErrors.refundAmount = "Refund amount is required.";
     }
 
     setErrors(nextErrors);
@@ -178,76 +156,7 @@ export default function RefundRequestPage() {
                 )}
               </div>
 
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Payment Method</label>
-                <select
-                  value={form.paymentMethod}
-                  onChange={(event) => handleChange("paymentMethod", event.target.value as PaymentMethod)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                >
-                  {(["Card", "Crypto", "Wallet", "Bank"] satisfies PaymentMethod[]).map((method) => (
-                    <option key={method} value={method}>
-                      {method}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Refund Type</label>
-                <select
-                  value={form.refundType}
-                  onChange={(event) => handleChange("refundType", event.target.value as RefundType)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                >
-                  {(["Full", "Partial", "Chargeback"] satisfies RefundType[]).map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Refund Amount *</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={form.refundAmount}
-                  onChange={(event) => handleChange("refundAmount", event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                  placeholder="0.00"
-                  required
-                />
-                {errors.refundAmount && (
-                  <p className="text-xs text-rose-400">{errors.refundAmount}</p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <label className="block text-sm font-medium">Reason</label>
-                <select
-                  value={form.reason}
-                  onChange={(event) => handleChange("reason", event.target.value as RefundReason)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                >
-                  {(
-                    [
-                      "Product not received",
-                      "Dissatisfied",
-                      "Duplicate charge",
-                      "Fraudulent",
-                      "Unauthorized",
-                      "Other"
-                    ] satisfies RefundReason[]
-                  ).map((reason) => (
-                    <option key={reason} value={reason}>
-                      {reason}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              
             </div>
 
             <div className="space-y-2">
@@ -321,22 +230,6 @@ export default function RefundRequestPage() {
                   <dd className="font-medium text-white">{confirmation.customerEmail}</dd>
                 </div>
               )}
-              <div>
-                <dt className="text-emerald-200/80">Payment Method</dt>
-                <dd className="font-medium text-white">{confirmation.paymentMethod}</dd>
-              </div>
-              <div>
-                <dt className="text-emerald-200/80">Refund Type</dt>
-                <dd className="font-medium text-white">{confirmation.refundType}</dd>
-              </div>
-              <div>
-                <dt className="text-emerald-200/80">Amount</dt>
-                <dd className="font-medium text-white">${Number(confirmation.refundAmount || 0).toFixed(2)}</dd>
-              </div>
-              <div className="sm:col-span-2">
-                <dt className="text-emerald-200/80">Reason</dt>
-                <dd className="font-medium text-white">{confirmation.reason}</dd>
-              </div>
               {confirmation.description && (
                 <div className="sm:col-span-2">
                   <dt className="text-emerald-200/80">Description</dt>
