@@ -255,37 +255,24 @@ export default function RefundRequestPage() {
                 <label className="block text-sm font-medium" htmlFor="reason">
                   Reason for Dispute <span className="text-rose-300">*</span>
                 </label>
-                <div className="group relative">
-                  <select
-                    id="reason"
-                    value={form.reason}
-                    onChange={(event) => handleChange("reason", event.target.value)}
-                    onBlur={() => handleBlur("reason")}
-                    className="w-full appearance-none rounded-2xl border border-white/10 bg-gradient-to-br from-slate-950/80 via-slate-950/50 to-slate-900/70 px-4 py-3 pr-12 text-sm text-slate-100 shadow-[0_10px_30px_-20px_rgba(15,118,110,0.65)] backdrop-blur-sm transition-colors focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/70 focus:ring-offset-0 hover:border-white/20"
-                    required
-                  >
-                    <option value="" disabled hidden>
-                      Select a reason
-                    </option>
-                    <option value="Product not received">Product not received</option>
-                    <option value="Service issue">Service issue</option>
-                    <option value="Duplicate charge">Duplicate charge</option>
-                    <option value="Unauthorized charge">Unauthorized charge</option>
-                    <option value="Fraud">Fraud</option>
-                    <option value="Other">Other</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
-                    <svg
-                      aria-hidden
-                      className="h-4 w-4 text-slate-500 transition-colors group-focus-within:text-brand-300"
-                      fill="none"
-                      viewBox="0 0 20 20"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.6" />
-                    </svg>
-                  </div>
-                </div>
+                <select
+                  id="reason"
+                  value={form.reason}
+                  onChange={(event) => handleChange("reason", event.target.value)}
+                  onBlur={() => handleBlur("reason")}
+                  className="w-full appearance-none rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  required
+                >
+                  <option value="" disabled hidden>
+                    Select a reason
+                  </option>
+                  <option value="Product not received">Product not received</option>
+                  <option value="Service issue">Service issue</option>
+                  <option value="Duplicate charge">Duplicate charge</option>
+                  <option value="Unauthorized charge">Unauthorized charge</option>
+                  <option value="Fraud">Fraud</option>
+                  <option value="Other">Other</option>
+                </select>
                 {touched.reason && errors.reason && (
                   <p className="text-xs text-rose-400">{errors.reason}</p>
                 )}
