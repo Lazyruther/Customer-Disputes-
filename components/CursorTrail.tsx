@@ -1,105 +1,74 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 const CURSOR_SIZE = 96;
-const EASING = 0.15;
+const EASING = 0.18;
 
-export function CursorTrail() {
-  const circleRef = useRef<HTMLDivElement | null>(null);
+const CursorTrail = () => {
+  const cursorRef = useRef<HTMLDivElement | null>(null);
   const frameRef = useRef<number>();
   const targetRef = useRef({ x: 0, y: 0 });
   const positionRef = useRef({ x: 0, y: 0 });
-  const [isEnabled, setIsEnabled] = useState(false);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
+    const cursor = cursorRef.current;
+    if (!cursor || typeof window === 'undefined') {
       return;
     }
 
-    const mediaQuery = window.matchMedia('(pointer: coarse)');
-    const handleMediaChange = () => {
-      setIsEnabled(!mediaQuery.matches);
+    const updateInitialPosition = () => {
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight / 2;
+
+      targetRef.current = { x: centerX, y: centerY };
+      positionRef.current = { x: centerX, y: centerY };
+      cursor.style.transform = `translate3d(${centerX - CURSOR_SIZE / 2}px, ${centerY - CURSOR_SIZE / 2}px, 0)`;
     };
 
-    handleMediaChange();
-
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', handleMediaChange);
-    } else {
-      mediaQuery.addListener(handleMediaChange);
-    }
-
-    return () => {
-      if (typeof mediaQuery.removeEventListener === 'function') {
-        mediaQuery.removeEventListener('change', handleMediaChange);
-      } else {
-        mediaQuery.removeListener(handleMediaChange);
-      }
+    const handleMouseMove = (event: MouseEvent) => {
+      targetRef.current.x = event.clientX;
+      targetRef.current.y = event.clientY;
     };
-  }, []);
-
-  useEffect(() => {
-    if (!isEnabled) {
-      return;
-    }
-
-    const circle = circleRef.current;
-    if (!circle) {
-      return;
-    }
-
-    const updatePosition = (event: PointerEvent) => {
-      targetRef.current = { x: event.clientX, y: event.clientY };
-    };
-
-    const initialX = window.innerWidth / 2;
-    const initialY = window.innerHeight / 2;
-    targetRef.current = { x: initialX, y: initialY };
-    positionRef.current = { x: initialX, y: initialY };
 
     const animate = () => {
-      const target = targetRef.current;
-      const position = positionRef.current;
+      const { x: targetX, y: targetY } = targetRef.current;
+      const { x, y } = positionRef.current;
 
-      position.x += (target.x - position.x) * EASING;
-      position.y += (target.y - position.y) * EASING;
+      positionRef.current.x = x + (targetX - x) * EASING;
+      positionRef.current.y = y + (targetY - y) * EASING;
 
-      circle.style.transform = `translate3d(${position.x - CURSOR_SIZE / 2}px, ${position.y - CURSOR_SIZE / 2}px, 0)`;
+      cursor.style.transform = `translate3d(${positionRef.current.x - CURSOR_SIZE / 2}px, ${
+        positionRef.current.y - CURSOR_SIZE / 2
+      }px, 0)`;
 
       frameRef.current = window.requestAnimationFrame(animate);
     };
 
+    updateInitialPosition();
     frameRef.current = window.requestAnimationFrame(animate);
-    window.addEventListener('pointermove', updatePosition);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('resize', updateInitialPosition);
 
     return () => {
-      window.removeEventListener('pointermove', updatePosition);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('resize', updateInitialPosition);
+
       if (frameRef.current) {
         window.cancelAnimationFrame(frameRef.current);
       }
     };
-  }, [isEnabled]);
-
-  if (!isEnabled) {
-    return null;
-  }
+  }, []);
 
   return (
     <div
-      ref={circleRef}
-      className="pointer-events-none fixed left-0 top-0 z-50 hidden select-none sm:block"
-      style={{
-        width: CURSOR_SIZE,
-        height: CURSOR_SIZE,
-        transform: `translate3d(-${CURSOR_SIZE / 2}px, -${CURSOR_SIZE / 2}px, 0)`
-      }}
-    >
-      <div
-        className="h-full w-full rounded-full bg-[radial-gradient(circle_at_center,_rgba(226,232,240,0.4),_rgba(56,189,248,0.15),_rgba(15,23,42,0))] mix-blend-difference opacity-90"
-      />
-    </div>
+      ref={cursorRef}
+      className="pointer-events-none fixed left-0 top-0 z-50 hidden h-24 w-24 rounded-full bg-[radial-gradient(circle_at_center,theme(colors.blue.500),theme(colors.purple.500))] opacity-30 blur-2xl mix-blend-difference will-change-[transform] md:block"
+      style={{ transform: `translate3d(-${CURSOR_SIZE / 2}px, -${CURSOR_SIZE / 2}px, 0)` }}
+      aria-hidden
+    />
   );
-}
+};
 
 export default CursorTrail;
