@@ -96,7 +96,7 @@ export default function RefundRequestPage() {
     <main className="px-4 py-10 text-white">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-8">
         <header className="text-center">
-          <h1 className="text-3xl font-semibold sm:text-4xl">Refund Request Form</h1>
+          <h1 className="text-3xl font-semibold sm:text-4xl">Customer Dispute Form</h1>
           <p className="mt-2 text-sm text-slate-300">
             Submit refund details quickly so our compliance team can review and act fast.
           </p>
