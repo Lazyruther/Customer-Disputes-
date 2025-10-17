@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import type { ComponentPropsWithoutRef } from 'react';
 
 export type DisputeCardProps = {
   id: number;
@@ -9,11 +10,31 @@ export type DisputeCardProps = {
   updatedAt: Date;
 };
 
+type IconProps = ComponentPropsWithoutRef<'svg'>;
+
 const statusTheme: Record<DisputeCardProps['status'], string> = {
   OPEN: 'bg-rose-500/20 text-rose-200 border border-rose-500/40',
   IN_PROGRESS: 'bg-amber-500/20 text-amber-200 border border-amber-500/40',
   RESOLVED: 'bg-emerald-500/20 text-emerald-200 border border-emerald-500/40'
 };
+
+function ArrowRightIcon(props: IconProps) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      {...props}
+    >
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </svg>
+  );
+}
 
 export function DisputeCard({ customerName, issue, status, createdAt, updatedAt }: DisputeCardProps) {
   return (
@@ -30,8 +51,9 @@ export function DisputeCard({ customerName, issue, status, createdAt, updatedAt 
       <p className="text-sm leading-relaxed text-slate-200">{issue}</p>
       <footer className="flex items-center justify-between text-xs text-slate-400">
         <span>Last updated {format(updatedAt, 'MMM d, yyyy')}</span>
-        <button className="rounded-lg border border-brand-400/20 bg-brand-500/10 px-3 py-1 font-medium text-brand-100 transition hover:border-brand-300/40 hover:bg-brand-500/20">
-          View timeline
+        <button className="group inline-flex items-center gap-1 rounded-lg border border-brand-400/20 bg-brand-500/10 px-3 py-1 font-medium text-brand-100 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 hover:border-brand-300/40 hover:bg-brand-500/20">
+          <span>View timeline</span>
+          <ArrowRightIcon className="h-4 w-4 transition-transform duration-500 ease-out group-hover:translate-x-1 group-focus-visible:translate-x-1" />
         </button>
       </footer>
     </article>
