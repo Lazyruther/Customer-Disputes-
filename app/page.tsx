@@ -40,7 +40,13 @@ const initialTouched: TouchedFields = {
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const requiredFields: (keyof RefundFormData)[] = ["transactionId", "customerEmail", "reason"];
+const MIN_DESCRIPTION_LENGTH = 30;
+const requiredFields: (keyof RefundFormData)[] = [
+  "transactionId",
+  "customerEmail",
+  "reason",
+  "description"
+];
 
 type IconProps = ComponentPropsWithoutRef<"svg">;
 
@@ -174,7 +180,11 @@ export default function RefundRequestPage() {
 
   const isEmailValid = form.customerEmail.trim() !== "" && emailPattern.test(form.customerEmail.trim());
   const isFormValid =
-    form.transactionId.trim() !== "" && isEmailValid && form.reason.trim() !== "" && !errors.proofFileName;
+    form.transactionId.trim() !== "" &&
+    isEmailValid &&
+    form.reason.trim() !== "" &&
+    form.description.trim().length >= MIN_DESCRIPTION_LENGTH &&
+    !errors.proofFileName;
 
   const selectedReason = useMemo<ReasonOption | "">(() => {
     return reasonOptions.find((option) => option === form.reason) ?? "";
@@ -233,6 +243,11 @@ export default function RefundRequestPage() {
       case "reason":
         if (!trimmed) {
           return "Choose a reason for the dispute.";
+        }
+        break;
+      case "description":
+        if (trimmed.length < MIN_DESCRIPTION_LENGTH) {
+          return "Description must be at least 30 characters.";
         }
         break;
       default:
@@ -345,7 +360,13 @@ export default function RefundRequestPage() {
       return { ...updated, ...nextErrors };
     });
 
-    setTouched((prev) => ({ ...prev, transactionId: true, customerEmail: true, reason: true }));
+    setTouched((prev) => ({
+      ...prev,
+      transactionId: true,
+      customerEmail: true,
+      reason: true,
+      description: true
+    }));
 
     return Object.keys(nextErrors).length === 0 && !errors.proofFileName;
   }
@@ -577,6 +598,9 @@ export default function RefundRequestPage() {
                   className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 transition duration-200 ease-in-out focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 hover:border-brand-300/60"
                   placeholder="Provide helpful details to speed up our investigation."
                 />
+                {touched.description && errors.description && (
+                  <p className="text-xs text-rose-400">{errors.description}</p>
+                )}
               </div>
 
               <div className="space-y-2">
