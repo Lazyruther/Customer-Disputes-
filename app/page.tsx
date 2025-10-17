@@ -43,7 +43,7 @@ const initialTouched: TouchedFields = {
 };
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const MIN_DESCRIPTION_LENGTH = 20;
+const MIN_DESCRIPTION_LENGTH = 30;
 const requiredFields: (keyof RefundFormData)[] = ["transactionId", "customerEmail", "reason"];
 
 type IconProps = ComponentPropsWithoutRef<"svg">;
@@ -177,8 +177,20 @@ export default function RefundRequestPage() {
   );
 
   const isEmailValid = form.customerEmail.trim() !== "" && emailPattern.test(form.customerEmail.trim());
+  const descriptionLength = form.description.trim().length;
+  const descriptionHelperId = "description-help";
+  const descriptionErrorId = "description-error";
+  const descriptionAriaDescribedBy = touched.description && errors.description
+    ? `${descriptionHelperId} ${descriptionErrorId}`
+    : descriptionHelperId;
+
   const isFormValid =
-    form.transactionId.trim() !== "" && isEmailValid && form.reason.trim() !== "" && !errors.proofFileName;
+    form.transactionId.trim() !== "" &&
+    isEmailValid &&
+    form.reason.trim() !== "" &&
+    descriptionLength >= MIN_DESCRIPTION_LENGTH &&
+    !errors.proofFileName &&
+    !errors.description;
 
   const selectedReason = useMemo<ReasonOption | "">(() => {
     return reasonOptions.find((option) => option === form.reason) ?? "";
@@ -244,6 +256,11 @@ export default function RefundRequestPage() {
       case "otherReasonDetails":
         if (form.reason === "Other" && !trimmed) {
           return "Provide additional details for the dispute.";
+        }
+        break;
+      case "description":
+        if (trimmed.length < MIN_DESCRIPTION_LENGTH) {
+          return "Please provide at least 30 characters of explanation.";
         }
         break;
       default:
@@ -380,6 +397,11 @@ export default function RefundRequestPage() {
       }
     }
 
+    const descriptionError = getFieldError("description", form.description);
+    if (descriptionError) {
+      nextErrors.description = descriptionError;
+    }
+
     setErrors((prev) => {
       const updated: FormErrors = { ...prev };
       requiredFields.forEach((field) => {
@@ -388,6 +410,7 @@ export default function RefundRequestPage() {
       if (form.reason !== "Other") {
         delete updated.otherReasonDetails;
       }
+      delete updated.description;
       return { ...updated, ...nextErrors };
     });
 
@@ -396,6 +419,7 @@ export default function RefundRequestPage() {
       transactionId: true,
       customerEmail: true,
       reason: true,
+      description: true,
       otherReasonDetails: form.reason === "Other" ? true : prev.otherReasonDetails
     }));
 
@@ -650,7 +674,19 @@ export default function RefundRequestPage() {
                   required
                   className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 transition duration-200 ease-in-out focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 hover:border-brand-300/60"
                   placeholder="Provide helpful details to speed up our investigation."
+                  aria-invalid={touched.description && !!errors.description}
+                  aria-describedby={descriptionAriaDescribedBy}
                 />
+                <div className="mt-1 flex flex-col gap-1">
+                  <p id={descriptionHelperId} className="text-xs text-slate-400">
+                    {descriptionLength} / {MIN_DESCRIPTION_LENGTH} characters minimum
+                  </p>
+                  {touched.description && errors.description ? (
+                    <p id={descriptionErrorId} className="text-sm text-red-500">
+                      {errors.description}
+                    </p>
+                  ) : null}
+                </div>
               </div>
 
               <div className="space-y-2">
