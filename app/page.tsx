@@ -4,7 +4,6 @@ import { FormEvent, useMemo, useState } from "react";
 
 type RefundFormData = {
   transactionId: string;
-  orderId: string;
   customerName: string;
   customerEmail: string;
   description: string;
@@ -22,7 +21,6 @@ type RefundConfirmation = RefundFormData & {
 
 const initialForm: RefundFormData = {
   transactionId: "",
-  orderId: "",
   customerName: "",
   customerEmail: "",
   description: "",
@@ -121,17 +119,6 @@ export default function RefundRequestPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium">Order ID</label>
-                <input
-                  type="text"
-                  value={form.orderId}
-                  onChange={(event) => handleChange("orderId", event.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-slate-900/70 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                  placeholder="Optional order reference"
-                />
-              </div>
-
-              <div className="space-y-2">
                 <label className="block text-sm font-medium">Customer Name</label>
                 <input
                   type="text"
@@ -212,12 +199,6 @@ export default function RefundRequestPage() {
                 <dt className="text-emerald-200/80">Transaction ID</dt>
                 <dd className="font-medium text-white">{confirmation.transactionId}</dd>
               </div>
-              {confirmation.orderId && (
-                <div>
-                  <dt className="text-emerald-200/80">Order ID</dt>
-                  <dd className="font-medium text-white">{confirmation.orderId}</dd>
-                </div>
-              )}
               {confirmation.customerName && (
                 <div>
                   <dt className="text-emerald-200/80">Customer</dt>
