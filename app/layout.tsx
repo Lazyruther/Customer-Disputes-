@@ -32,7 +32,7 @@ export default function RootLayout({
               <header className="mb-12 flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
                 <div className="max-w-2xl space-y-4">
                   <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1 text-xs font-medium uppercase tracking-[0.35em] text-slate-200/80">
-                    Customer Success Command
+                    Customer Dispute Desk
                   </span>
                   <div>
                     <h1 className="text-4xl font-semibold tracking-tight text-transparent md:text-5xl">
