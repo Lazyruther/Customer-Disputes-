@@ -31,15 +31,9 @@ export default function RootLayout({
             <div className="container py-10">
               <header className="mb-12 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.3em] text-slate-400">customer success</p>
                   <h1 className="text-4xl font-semibold tracking-tight text-white md:text-5xl">
-                    Customer Dispute Operations
+                    Refund & Dispute Center
                   </h1>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="rounded-full border border-brand-400/40 bg-brand-500/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-brand-200">
-                    live dashboard
-                  </span>
                 </div>
               </header>
               {children}
