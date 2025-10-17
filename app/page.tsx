@@ -4,7 +4,10 @@ import {
   ChangeEvent,
   ComponentPropsWithoutRef,
   FormEvent,
+  useCallback,
+  useEffect,
   useMemo,
+  useRef,
   useState
 } from "react";
 
@@ -138,6 +141,17 @@ const highlightCards: HighlightCard[] = [
   }
 ];
 
+const reasonOptions = [
+  "Product not received",
+  "Service issue",
+  "Duplicate charge",
+  "Unauthorized charge",
+  "Fraud",
+  "Other"
+] as const;
+
+type ReasonOption = (typeof reasonOptions)[number];
+
 export default function RefundRequestPage() {
   const [form, setForm] = useState<RefundFormData>(initialForm);
   const [errors, setErrors] = useState<FormErrors>({});
@@ -145,16 +159,55 @@ export default function RefundRequestPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [activeHighlight, setActiveHighlight] = useState<string>(highlightCards[0]?.title ?? "");
+  const [isReasonMenuOpen, setIsReasonMenuOpen] = useState(false);
+  const reasonMenuRef = useRef<HTMLDivElement | null>(null);
 
   const emailPattern = useMemo(
     () =>
-      /^(?:[a-zA-Z0-9_'^&+{}=!-]+(?:\.[a-zA-Z0-9_'^&+{}=!-]+)*|"(?:[^"\\]|\\.)+")@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/,
+      /^(?:[a-zA-Z0-9_'^&+{}=!-]+(?:\.[a-zA-Z0-9_'^&+{}=!-]+)*|"(?:[^"\\]|\\.)+")@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/, 
     []
   );
 
   const isEmailValid = form.customerEmail.trim() !== "" && emailPattern.test(form.customerEmail.trim());
   const isFormValid =
     form.transactionId.trim() !== "" && isEmailValid && form.reason.trim() !== "" && !errors.proofFileName;
+
+  const selectedReason = useMemo<ReasonOption | "">(() => {
+    return reasonOptions.find((option) => option === form.reason) ?? "";
+  }, [form.reason]);
+
+  const markReasonTouched = useCallback((value: string) => {
+    setTouched((prev) => ({ ...prev, reason: true }));
+    setErrors((prev) => {
+      const next = { ...prev };
+      const trimmed = value.trim();
+      if (!trimmed) {
+        next.reason = "Choose a reason for the dispute.";
+      } else {
+        delete next.reason;
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (!isReasonMenuOpen || !reasonMenuRef.current) {
+        return;
+      }
+
+      if (!reasonMenuRef.current.contains(event.target as Node)) {
+        setIsReasonMenuOpen(false);
+        markReasonTouched(form.reason);
+      }
+    }
+
+    window.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      window.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [form.reason, isReasonMenuOpen, markReasonTouched]);
 
   function getFieldError(field: keyof RefundFormData, value: string): string | undefined {
     const trimmed = value.trim();
@@ -319,10 +372,10 @@ export default function RefundRequestPage() {
                 onClick={() => setActiveHighlight(title)}
                 onFocus={() => setActiveHighlight(title)}
                 onMouseEnter={() => setActiveHighlight(title)}
-                className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/40 p-6 text-left transition duration-500 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 ${
+                className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/40 p-6 text-left transition-transform duration-300 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 active:scale-95 ${
                   isActive
                     ? "border-brand-400/60 bg-slate-900/70 shadow-lg shadow-brand-900/40"
-                    : "hover:-translate-y-1 hover:border-brand-400/50 hover:bg-slate-900/60"
+                    : "hover:-translate-y-1 hover:scale-[1.02] hover:border-brand-400/50 hover:bg-slate-900/60 hover:shadow-lg hover:shadow-brand-900/30"
                 }`}
                 aria-pressed={isActive}
               >
@@ -361,8 +414,10 @@ export default function RefundRequestPage() {
         </section>
 
         {successMessage && (
-          <div
-            className="group flex items-start gap-3 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-100 shadow-lg"
+          <button
+            type="button"
+            onClick={() => setSuccessMessage(null)}
+            className="group flex items-start gap-3 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-left text-sm text-emerald-100 shadow-lg transition-transform duration-300 ease-in-out hover:scale-[1.01] hover:shadow-emerald-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 active:scale-95"
             role="status"
             aria-live="polite"
           >
@@ -374,10 +429,10 @@ export default function RefundRequestPage() {
               <CheckCircleIcon className="relative h-6 w-6 transition duration-500 ease-out group-hover:-translate-y-0.5 group-hover:scale-110" />
             </span>
             <p className="leading-relaxed">{successMessage}</p>
-          </div>
+          </button>
         )}
 
-        <section className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-2xl backdrop-blur-sm sm:p-10">
+        <section className="rounded-3xl border border-white/10 bg-slate-900/60 p-6 shadow-2xl transition-transform duration-300 ease-in-out hover:-translate-y-1 hover:shadow-brand-900/30 focus-within:-translate-y-1 focus-within:shadow-brand-900/30 backdrop-blur-sm sm:p-10">
           <form className="space-y-6" onSubmit={handleSubmit} noValidate>
             <div className="space-y-5">
               <div className="space-y-2">
@@ -390,7 +445,7 @@ export default function RefundRequestPage() {
                   value={form.transactionId}
                   onChange={(event) => handleChange("transactionId", event.target.value)}
                   onBlur={() => handleBlur("transactionId")}
-                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 transition duration-200 ease-in-out focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 hover:border-brand-300/60"
                   placeholder="e.g. TXN-284729"
                   required
                 />
@@ -409,7 +464,7 @@ export default function RefundRequestPage() {
                   value={form.customerEmail}
                   onChange={(event) => handleChange("customerEmail", event.target.value)}
                   onBlur={() => handleBlur("customerEmail")}
-                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 transition duration-200 ease-in-out focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 hover:border-brand-300/60"
                   placeholder="customer@example.com"
                   required
                 />
@@ -419,27 +474,111 @@ export default function RefundRequestPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium" htmlFor="reason">
+                <label className="block text-sm font-medium" htmlFor="reason-toggle">
                   Reason for Dispute <span className="text-rose-300">*</span>
                 </label>
-                <select
-                  id="reason"
-                  value={form.reason}
-                  onChange={(event) => handleChange("reason", event.target.value)}
-                  onBlur={() => handleBlur("reason")}
-                  className="w-full appearance-none rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                  required
-                >
-                  <option value="" disabled hidden>
-                    Select a reason
-                  </option>
-                  <option value="Product not received">Product not received</option>
-                  <option value="Service issue">Service issue</option>
-                  <option value="Duplicate charge">Duplicate charge</option>
-                  <option value="Unauthorized charge">Unauthorized charge</option>
-                  <option value="Fraud">Fraud</option>
-                  <option value="Other">Other</option>
-                </select>
+                <div className="relative" ref={reasonMenuRef}>
+                  <button
+                    id="reason-toggle"
+                    type="button"
+                    onClick={() => setIsReasonMenuOpen((prev) => !prev)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setIsReasonMenuOpen((prev) => !prev);
+                        return;
+                      }
+
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        setIsReasonMenuOpen(false);
+                        markReasonTouched(form.reason);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (!isReasonMenuOpen) {
+                        handleBlur("reason");
+                      }
+                    }}
+                    aria-haspopup="listbox"
+                    aria-expanded={isReasonMenuOpen}
+                    className={`flex w-full items-center justify-between rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-left text-sm transition duration-200 ease-in-out hover:border-brand-300/60 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 ${
+                      isReasonMenuOpen ? "ring-2 ring-brand-400" : ""
+                    }`}
+                  >
+                    <span className={selectedReason ? "text-white" : "text-slate-400"}>
+                      {selectedReason || "Select a reason"}
+                    </span>
+                    <svg
+                      className={`h-4 w-4 transition-transform duration-200 ease-in-out ${
+                        isReasonMenuOpen ? "rotate-180" : ""
+                      }`}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={1.8}
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                  <div
+                    role="listbox"
+                    aria-label="Dispute reasons"
+                    className={`absolute left-0 right-0 top-full z-10 mt-2 origin-top rounded-2xl border border-white/10 bg-slate-950/90 p-1 text-sm shadow-xl backdrop-blur transition-all duration-200 ease-out ${
+                      isReasonMenuOpen
+                        ? "pointer-events-auto scale-100 opacity-100"
+                        : "pointer-events-none scale-95 opacity-0"
+                    }`}
+                  >
+                    {reasonOptions.map((option) => {
+                      const isSelected = option === selectedReason;
+                      return (
+                        <button
+                          type="button"
+                          key={option}
+                          role="option"
+                          aria-selected={isSelected}
+                          onClick={() => {
+                            handleChange("reason", option);
+                            setIsReasonMenuOpen(false);
+                            handleBlur("reason");
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              setIsReasonMenuOpen(false);
+                              markReasonTouched(form.reason);
+                              const toggle = document.getElementById("reason-toggle") as HTMLButtonElement | null;
+                              toggle?.focus();
+                            }
+                          }}
+                          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left transition duration-200 ease-in-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 hover:bg-brand-500/10 ${
+                            isSelected ? "bg-brand-500/20 text-brand-100" : "text-slate-200"
+                          }`}
+                        >
+                          <span>{option}</span>
+                          {isSelected && (
+                            <svg
+                              className="h-4 w-4"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={1.8}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="m9 12.5 2.1 2.1L15 11" />
+                            </svg>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
                 {touched.reason && errors.reason && (
                   <p className="text-xs text-rose-400">{errors.reason}</p>
                 )}
@@ -454,7 +593,7 @@ export default function RefundRequestPage() {
                   value={form.description}
                   onChange={(event) => handleChange("description", event.target.value)}
                   onBlur={() => handleBlur("description")}
-                  className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 transition duration-200 ease-in-out focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 hover:border-brand-300/60"
                   placeholder="Provide helpful details to speed up our investigation."
                 />
               </div>
@@ -469,7 +608,7 @@ export default function RefundRequestPage() {
                   type="file"
                   accept=".jpg,.jpeg,.png,.pdf"
                   onChange={handleFileChange}
-                  className="w-full cursor-pointer rounded-2xl border border-dashed border-white/20 bg-slate-950/40 px-4 py-5 text-sm text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-brand-500 file:px-4 file:py-2 file:text-white hover:border-brand-400/60"
+                  className="w-full cursor-pointer rounded-2xl border border-dashed border-white/20 bg-slate-950/40 px-4 py-5 text-sm text-slate-300 transition duration-200 ease-in-out hover:border-brand-400/60 hover:bg-slate-950/60 file:mr-4 file:rounded-xl file:border-0 file:bg-brand-500 file:px-4 file:py-2 file:text-white"
                 />
                 <p className="text-xs text-slate-400">Max 5MB. Accepted formats: JPG, PNG, PDF.</p>
                 {form.proofFileName && !errors.proofFileName && (
