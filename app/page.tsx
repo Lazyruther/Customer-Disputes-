@@ -3,7 +3,9 @@
 import {
   ChangeEvent,
   ComponentPropsWithoutRef,
+  DragEvent,
   FormEvent,
+  useEffect,
   useMemo,
   useState
 } from "react";
@@ -145,12 +147,65 @@ export default function RefundRequestPage() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
   const [activeHighlight, setActiveHighlight] = useState<string>(highlightCards[0]?.title ?? "");
+  const [autoRotateHighlights, setAutoRotateHighlights] = useState(true);
+  const [focusedField, setFocusedField] = useState<keyof RefundFormData | null>(null);
+  const [isReasonMenuOpen, setIsReasonMenuOpen] = useState(false);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
 
   const emailPattern = useMemo(
     () =>
       /^(?:[a-zA-Z0-9_'^&+{}=!-]+(?:\.[a-zA-Z0-9_'^&+{}=!-]+)*|"(?:[^"\\]|\\.)+")@(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}$/,
     []
   );
+
+  const fieldHints = useMemo<
+    Record<keyof RefundFormData, string>
+  >(
+    () => ({
+      transactionId:
+        "Enter the transaction number from your statement so we can fast-track the lookup.",
+      customerEmail:
+        "Provide the email tied to the purchase. We use it to send updates and confirm ownership.",
+      reason:
+        "Choose the best fitting dispute type. This routes the request to the correct specialist.",
+      description:
+        "Share helpful context—dates, conversations, or product details—to strengthen your case.",
+      proofFileName:
+        "Upload receipts, chat transcripts, or screenshots that support your claim (max 5MB)."
+    }),
+    []
+  );
+
+  const highlightTitles = useMemo(
+    () => highlightCards.map(({ title }) => title),
+    []
+  );
+
+  const activeHighlightCard = useMemo(
+    () => highlightCards.find((card) => card.title === activeHighlight),
+    [activeHighlight]
+  );
+
+  useEffect(() => {
+    if (!autoRotateHighlights) {
+      const resumeTimer = window.setTimeout(() => setAutoRotateHighlights(true), 12000);
+      return () => window.clearTimeout(resumeTimer);
+    }
+
+    if (highlightTitles.length <= 1) {
+      return;
+    }
+
+    const rotationId = window.setInterval(() => {
+      setActiveHighlight((current) => {
+        const currentIndex = highlightTitles.indexOf(current);
+        const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % highlightTitles.length;
+        return highlightTitles[nextIndex] ?? current;
+      });
+    }, 6000);
+
+    return () => window.clearInterval(rotationId);
+  }, [autoRotateHighlights, highlightTitles]);
 
   const isEmailValid = form.customerEmail.trim() !== "" && emailPattern.test(form.customerEmail.trim());
   const isFormValid =
@@ -205,13 +260,19 @@ export default function RefundRequestPage() {
     updateFieldError(field, value);
   }
 
+  function handleFieldFocus<T extends keyof RefundFormData>(field: T) {
+    setFocusedField(field);
+  }
+
   function handleBlur<T extends keyof RefundFormData>(field: T) {
+    setFocusedField((current) => (current === field ? null : current));
     setTouched((prev) => ({ ...prev, [field]: true }));
     updateFieldError(field, form[field]);
   }
 
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     setSuccessMessage(null);
+    setIsDraggingFile(false);
     setTouched((prev) => ({ ...prev, proofFileName: true }));
 
     const file = event.target.files?.[0];
@@ -239,6 +300,33 @@ export default function RefundRequestPage() {
       return next;
     });
     setForm((prev) => ({ ...prev, proofFileName: file.name }));
+  }
+
+  function handleFileDragOver(event: DragEvent<HTMLInputElement>) {
+    event.preventDefault();
+    setIsDraggingFile(true);
+  }
+
+  function handleFileDragLeave(event?: DragEvent<HTMLInputElement>) {
+    event?.preventDefault();
+    setIsDraggingFile(false);
+  }
+
+  function handleHighlightInteraction(title: string) {
+    setActiveHighlight(title);
+    setAutoRotateHighlights(false);
+  }
+
+  function handleHighlightRest() {
+    setAutoRotateHighlights(true);
+  }
+
+  function getFieldDescribedBy(field: keyof RefundFormData) {
+    const ids = [`${field}-hint`];
+    if (touched[field] && errors[field]) {
+      ids.push(`${field}-error`);
+    }
+    return ids.join(" ");
   }
 
   function validateForm() {
@@ -285,6 +373,9 @@ export default function RefundRequestPage() {
 
     setForm({ ...initialForm });
     setTouched({ ...initialTouched });
+    setFocusedField(null);
+    setIsReasonMenuOpen(false);
+    setIsDraggingFile(false);
     setErrors((prev) => {
       const next = { ...prev };
       requiredFields.forEach((field) => {
@@ -309,6 +400,7 @@ export default function RefundRequestPage() {
         <section
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
           aria-label="Dispute assistance highlights"
+          aria-describedby="active-highlight-description"
         >
           {highlightCards.map(({ title, description, Icon }) => {
             const isActive = title === activeHighlight;
@@ -316,15 +408,18 @@ export default function RefundRequestPage() {
               <button
                 key={title}
                 type="button"
-                onClick={() => setActiveHighlight(title)}
-                onFocus={() => setActiveHighlight(title)}
-                onMouseEnter={() => setActiveHighlight(title)}
-                className={`group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/40 p-6 text-left transition duration-500 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 ${
+                onClick={() => handleHighlightInteraction(title)}
+                onFocus={() => handleHighlightInteraction(title)}
+                onMouseEnter={() => handleHighlightInteraction(title)}
+                onBlur={handleHighlightRest}
+                onMouseLeave={handleHighlightRest}
+                className={`highlight-card group relative overflow-hidden rounded-3xl border border-white/10 bg-slate-900/40 p-6 text-left transition duration-500 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-300 ${
                   isActive
-                    ? "border-brand-400/60 bg-slate-900/70 shadow-lg shadow-brand-900/40"
+                    ? "is-active border-brand-400/60 bg-slate-900/70"
                     : "hover:-translate-y-1 hover:border-brand-400/50 hover:bg-slate-900/60"
                 }`}
                 aria-pressed={isActive}
+                aria-describedby={isActive ? "active-highlight-description" : undefined}
               >
                 <span
                   className={`pointer-events-none absolute -inset-px bg-gradient-to-br from-brand-500/0 via-white/5 to-white/0 opacity-0 transition duration-500 ease-out ${
@@ -360,9 +455,15 @@ export default function RefundRequestPage() {
           })}
         </section>
 
+        {activeHighlightCard && (
+          <p id="active-highlight-description" className="sr-only">
+            {activeHighlightCard.description}
+          </p>
+        )}
+
         {successMessage && (
           <div
-            className="group flex items-start gap-3 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-100 shadow-lg"
+            className="group animate-fade-in flex items-start gap-3 rounded-2xl border border-emerald-500/40 bg-emerald-500/10 p-4 text-sm text-emerald-100 shadow-lg"
             role="status"
             aria-live="polite"
           >
@@ -384,18 +485,28 @@ export default function RefundRequestPage() {
                 <label className="block text-sm font-medium" htmlFor="transactionId">
                   Transaction ID <span className="text-rose-300">*</span>
                 </label>
+                <p id="transactionId-hint" className="sr-only">
+                  {fieldHints.transactionId}
+                </p>
                 <input
                   id="transactionId"
                   type="text"
                   value={form.transactionId}
                   onChange={(event) => handleChange("transactionId", event.target.value)}
+                  onFocus={() => handleFieldFocus("transactionId")}
                   onBlur={() => handleBlur("transactionId")}
-                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  className={`interactive-field w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 ${
+                    focusedField === "transactionId" ? "interactive-field-active" : ""
+                  }`}
                   placeholder="e.g. TXN-284729"
+                  title={fieldHints.transactionId}
+                  aria-describedby={getFieldDescribedBy("transactionId")}
                   required
                 />
                 {touched.transactionId && errors.transactionId && (
-                  <p className="text-xs text-rose-400">{errors.transactionId}</p>
+                  <p id="transactionId-error" className="text-xs text-rose-400">
+                    {errors.transactionId}
+                  </p>
                 )}
               </div>
 
@@ -403,18 +514,28 @@ export default function RefundRequestPage() {
                 <label className="block text-sm font-medium" htmlFor="customerEmail">
                   Customer Email <span className="text-rose-300">*</span>
                 </label>
+                <p id="customerEmail-hint" className="sr-only">
+                  {fieldHints.customerEmail}
+                </p>
                 <input
                   id="customerEmail"
                   type="email"
                   value={form.customerEmail}
                   onChange={(event) => handleChange("customerEmail", event.target.value)}
+                  onFocus={() => handleFieldFocus("customerEmail")}
                   onBlur={() => handleBlur("customerEmail")}
-                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  className={`interactive-field w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 ${
+                    focusedField === "customerEmail" ? "interactive-field-active" : ""
+                  }`}
                   placeholder="customer@example.com"
+                  title={fieldHints.customerEmail}
+                  aria-describedby={getFieldDescribedBy("customerEmail")}
                   required
                 />
                 {touched.customerEmail && errors.customerEmail && (
-                  <p className="text-xs text-rose-400">{errors.customerEmail}</p>
+                  <p id="customerEmail-error" className="text-xs text-rose-400">
+                    {errors.customerEmail}
+                  </p>
                 )}
               </div>
 
@@ -422,26 +543,62 @@ export default function RefundRequestPage() {
                 <label className="block text-sm font-medium" htmlFor="reason">
                   Reason for Dispute <span className="text-rose-300">*</span>
                 </label>
-                <select
-                  id="reason"
-                  value={form.reason}
-                  onChange={(event) => handleChange("reason", event.target.value)}
-                  onBlur={() => handleBlur("reason")}
-                  className="w-full appearance-none rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
-                  required
-                >
-                  <option value="" disabled hidden>
-                    Select a reason
-                  </option>
-                  <option value="Product not received">Product not received</option>
-                  <option value="Service issue">Service issue</option>
-                  <option value="Duplicate charge">Duplicate charge</option>
-                  <option value="Unauthorized charge">Unauthorized charge</option>
-                  <option value="Fraud">Fraud</option>
-                  <option value="Other">Other</option>
-                </select>
+                <p id="reason-hint" className="sr-only">
+                  {fieldHints.reason}
+                </p>
+                <div className="relative">
+                  <select
+                    id="reason"
+                    value={form.reason}
+                    onChange={(event) => {
+                      handleChange("reason", event.target.value);
+                      setIsReasonMenuOpen(false);
+                    }}
+                    onFocus={() => {
+                      handleFieldFocus("reason");
+                      setIsReasonMenuOpen(true);
+                    }}
+                    onBlur={() => {
+                      handleBlur("reason");
+                      setIsReasonMenuOpen(false);
+                    }}
+                    onMouseDown={() => setIsReasonMenuOpen(true)}
+                    onKeyDown={(event) => {
+                      if ([" ", "Enter", "ArrowDown", "ArrowUp"].includes(event.key)) {
+                        setIsReasonMenuOpen(true);
+                      }
+                    }}
+                    className={`interactive-field w-full appearance-none rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 pr-12 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 ${
+                      focusedField === "reason" || isReasonMenuOpen ? "interactive-field-active" : ""
+                    }`}
+                    title={fieldHints.reason}
+                    aria-describedby={getFieldDescribedBy("reason")}
+                    aria-expanded={isReasonMenuOpen}
+                    required
+                  >
+                    <option value="" disabled hidden>
+                      Select a reason
+                    </option>
+                    <option value="Product not received">Product not received</option>
+                    <option value="Service issue">Service issue</option>
+                    <option value="Duplicate charge">Duplicate charge</option>
+                    <option value="Unauthorized charge">Unauthorized charge</option>
+                    <option value="Fraud">Fraud</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  <span
+                    className={`select-chevron pointer-events-none absolute right-4 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-xs transition-all duration-300 ease-out ${
+                      isReasonMenuOpen ? "rotate-180 bg-brand-500/20 text-brand-100" : "bg-white/5 text-slate-300"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    ▾
+                  </span>
+                </div>
                 {touched.reason && errors.reason && (
-                  <p className="text-xs text-rose-400">{errors.reason}</p>
+                  <p id="reason-error" className="text-xs text-rose-400">
+                    {errors.reason}
+                  </p>
                 )}
               </div>
 
@@ -449,13 +606,21 @@ export default function RefundRequestPage() {
                 <label className="block text-sm font-medium" htmlFor="description">
                   Description / Explanation
                 </label>
+                <p id="description-hint" className="sr-only">
+                  {fieldHints.description}
+                </p>
                 <textarea
                   id="description"
                   value={form.description}
                   onChange={(event) => handleChange("description", event.target.value)}
+                  onFocus={() => handleFieldFocus("description")}
                   onBlur={() => handleBlur("description")}
-                  className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400"
+                  className={`interactive-field min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm placeholder:text-slate-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 ${
+                    focusedField === "description" ? "interactive-field-active" : ""
+                  }`}
                   placeholder="Provide helpful details to speed up our investigation."
+                  title={fieldHints.description}
+                  aria-describedby={getFieldDescribedBy("description")}
                 />
               </div>
 
@@ -463,20 +628,35 @@ export default function RefundRequestPage() {
                 <label className="block text-sm font-medium" htmlFor="proof">
                   Upload Proof
                 </label>
+                <p id="proofFileName-hint" className="sr-only">
+                  {fieldHints.proofFileName}
+                </p>
                 <input
                   key={fileInputKey}
                   id="proof"
                   type="file"
                   accept=".jpg,.jpeg,.png,.pdf"
                   onChange={handleFileChange}
-                  className="w-full cursor-pointer rounded-2xl border border-dashed border-white/20 bg-slate-950/40 px-4 py-5 text-sm text-slate-300 file:mr-4 file:rounded-xl file:border-0 file:bg-brand-500 file:px-4 file:py-2 file:text-white hover:border-brand-400/60"
+                  onFocus={() => handleFieldFocus("proofFileName")}
+                  onBlur={() => handleBlur("proofFileName")}
+                  onDragEnter={handleFileDragOver}
+                  onDragOver={handleFileDragOver}
+                  onDragLeave={handleFileDragLeave}
+                  onDrop={handleFileDragLeave}
+                  className={`interactive-field file-input w-full cursor-pointer rounded-2xl border border-dashed border-white/20 bg-slate-950/40 px-4 py-5 text-sm text-slate-300 transition focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400 file:mr-4 file:rounded-xl file:border-0 file:bg-brand-500 file:px-4 file:py-2 file:text-white hover:border-brand-400/60 ${
+                    focusedField === "proofFileName" || isDraggingFile ? "interactive-field-active file-drop-active" : ""
+                  }`}
+                  title={fieldHints.proofFileName}
+                  aria-describedby={getFieldDescribedBy("proofFileName")}
                 />
                 <p className="text-xs text-slate-400">Max 5MB. Accepted formats: JPG, PNG, PDF.</p>
                 {form.proofFileName && !errors.proofFileName && (
                   <p className="text-xs text-slate-300">Selected file: {form.proofFileName}</p>
                 )}
                 {errors.proofFileName && (
-                  <p className="text-xs text-rose-400">{errors.proofFileName}</p>
+                  <p id="proofFileName-error" className="text-xs text-rose-400">
+                    {errors.proofFileName}
+                  </p>
                 )}
               </div>
             </div>
@@ -486,7 +666,10 @@ export default function RefundRequestPage() {
               <button
                 type="submit"
                 disabled={!isFormValid}
-                className="inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition focus:outline-none focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 focus:ring-offset-slate-950 hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-brand-500/50 disabled:text-white/70"
+                className={`interactive-button inline-flex items-center justify-center rounded-full bg-brand-500 px-6 py-3 text-sm font-semibold text-white transition focus:outline-none focus:ring-2 focus:ring-brand-300 focus:ring-offset-2 focus:ring-offset-slate-950 hover:bg-brand-400 disabled:cursor-not-allowed disabled:bg-brand-500/50 disabled:text-white/70 ${
+                  isFormValid ? "interactive-button-active" : ""
+                }`}
+                title={isFormValid ? "Submit your refund request" : "Complete required fields to enable submission"}
               >
                 Submit refund request
               </button>
